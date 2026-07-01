@@ -32,7 +32,7 @@ svg { flex-shrink: 0; }
 .topbar {
   height: 64px;
   display: grid;
-  grid-template-columns: 44px auto minmax(260px, 1fr) auto auto auto auto;
+  grid-template-columns: 44px auto minmax(240px, 1fr) auto auto auto auto auto;
   align-items: center;
   gap: 14px;
   padding: 0 28px;
@@ -42,6 +42,28 @@ svg { flex-shrink: 0; }
   top: 0;
   z-index: 10;
   backdrop-filter: blur(18px);
+}
+.wallet-select {
+  display: inline-grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.04);
+}
+.wallet-select button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 900;
+}
+.wallet-select button.active {
+  color: var(--text);
+  background: rgba(239,60,255,.16);
 }
 .logo-mark {
   height: 32px;
@@ -321,7 +343,7 @@ p { color: var(--muted); }
   gap: 10px;
 }
 .football-events article {
-  min-height: 170px;
+  min-height: 150px;
   border: 1px solid var(--line);
   border-radius: 13px;
   background-size: cover;
@@ -349,13 +371,17 @@ p { color: var(--muted); }
 }
 .team-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
+  max-height: 390px;
+  overflow: auto;
+  padding-right: 4px;
 }
 .team-strip button {
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 10px;
+  min-height: 82px;
+  padding: 9px;
   color: var(--text);
   background: rgba(255,255,255,.045);
   display: grid;
@@ -363,10 +389,34 @@ p { color: var(--muted); }
   text-align: left;
 }
 .team-strip button span { color: var(--gold); font-weight: 900; }
+.team-strip button strong {
+  font-size: 13px;
+  line-height: 1.15;
+}
 .team-strip button em {
   color: var(--muted);
   font-style: normal;
   font-size: 12px;
+}
+.confed-summary {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+}
+.confed-summary span {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,255,255,.045);
+  color: var(--muted);
+  padding: 8px;
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.confed-summary strong {
+  color: var(--text);
+  font-size: 18px;
 }
 
 .section-title {
@@ -879,11 +929,14 @@ p { color: var(--muted); }
 
 @media (max-width: 1180px) {
   .topbar { grid-template-columns: 44px 1fr; height: auto; padding: 14px; }
-  .main-nav, .search, .deposit, .wallet-pill, .wallet-address { grid-column: span 2; justify-self: stretch; max-width: none; }
+  .main-nav, .search, .wallet-select, .deposit, .wallet-pill, .wallet-address { grid-column: span 2; justify-self: stretch; max-width: none; }
+  .wallet-select { grid-template-columns: repeat(3, 1fr); }
   .market-shell, .feature-grid, .feature-grid.football-grid, .portfolio-view { grid-template-columns: 1fr; }
   .category-hero { grid-template-columns: 1fr; }
   .market-grid, .tickets-view, .create-form, .outcome-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .football-events, .team-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .football-events { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .team-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .confed-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
@@ -891,6 +944,7 @@ p { color: var(--muted); }
   .market-shell { padding: 0 12px; }
   .market-grid, .tickets-view, .create-form, .outcome-board { grid-template-columns: 1fr; }
   .football-events, .team-strip { grid-template-columns: 1fr; }
+  .confed-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .volume-board button { grid-template-columns: 1fr; }
   .section-title { align-items: flex-start; flex-direction: column; gap: 10px; }
   .outcome { grid-template-columns: 1fr auto; }

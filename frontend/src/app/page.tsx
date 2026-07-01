@@ -92,7 +92,10 @@ type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] | Record<string, unknown> }) => Promise<unknown>;
   on?: (event: string, handler: (...args: any[]) => void) => void;
   removeListener?: (event: string, handler: (...args: any[]) => void) => void;
+  providers?: EthereumProvider[];
 };
+
+type WalletKind = "metamask" | "rabby" | "okx";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x99EeB36b0BbC46bc00227d16d0b884DD9940994f";
 const STUDIO_CHAIN_ID = "0xf22f";
@@ -103,6 +106,8 @@ const GENLAYER_STUDIO_URL = "https://studio.genlayer.com/";
 declare global {
   interface Window {
     ethereum?: EthereumProvider;
+    okxwallet?: EthereumProvider;
+    rabby?: EthereumProvider;
   }
 }
 
@@ -110,6 +115,11 @@ const categories = ["All", "World Cup", "Crypto", "AI", "Politics", "Economy", "
 const navItems = ["Markets", "Portfolio", "Leaderboard", "Earn Tickets"];
 const navIcons = { Markets: ChartCandlestick, Portfolio: ShoppingCart, Leaderboard: Trophy, "Earn Tickets": Gift };
 const categoryIcons = { All: Globe2, "World Cup": Trophy, Crypto: Coins, AI: BrainCircuit, Politics: ShieldCheck, Economy: CircleDollarSign, Sports: Medal, Culture: Sparkles, New: Flame };
+const walletOptions: Array<{ id: WalletKind; label: string }> = [
+  { id: "metamask", label: "MetaMask" },
+  { id: "rabby", label: "Rabby" },
+  { id: "okx", label: "OKX" }
+];
 const categoryImages: Record<string, string> = {
   "World Cup": "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=1400&q=80",
   Crypto: "https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?auto=format&fit=crop&w=1400&q=80",
@@ -137,22 +147,73 @@ const worldCupImages = [
     title: "Host nation futures",
     image: "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?auto=format&fit=crop&w=1200&q=85",
     detail: "USA, Canada, and Mexico markets can use local conditions as context."
+  },
+  {
+    title: "Underdog breakout board",
+    image: "https://images.unsplash.com/photo-1552318965-6e6be7484ada?auto=format&fit=crop&w=1200&q=85",
+    detail: "Debutants and returnees create high-volatility prediction opportunities."
+  },
+  {
+    title: "Group stage volatility",
+    image: "https://images.unsplash.com/photo-1508098682722-e99c643e7f0b?auto=format&fit=crop&w=1200&q=85",
+    detail: "Third-place rules, goal difference, and late goals can move markets fast."
+  },
+  {
+    title: "Final path simulator",
+    image: "https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?auto=format&fit=crop&w=1200&q=85",
+    detail: "Bracket paths, travel distance, rest days, and climate all affect favorites."
   }
 ];
 
 const worldCupTeams = [
-  { name: "USA", flag: "US", group: "Host" },
-  { name: "Canada", flag: "CA", group: "Host" },
-  { name: "Mexico", flag: "MX", group: "Host" },
-  { name: "Argentina", flag: "AR", group: "CONMEBOL" },
-  { name: "Brazil", flag: "BR", group: "CONMEBOL" },
-  { name: "Japan", flag: "JP", group: "AFC" },
-  { name: "New Zealand", flag: "NZ", group: "OFC" },
-  { name: "IR Iran", flag: "IR", group: "AFC" },
-  { name: "South Korea", flag: "KR", group: "AFC" },
-  { name: "Uzbekistan", flag: "UZ", group: "AFC" },
-  { name: "Jordan", flag: "JO", group: "AFC" },
-  { name: "Ecuador", flag: "EC", group: "CONMEBOL" }
+  { name: "Canada", code: "CAN", group: "Host" },
+  { name: "Mexico", code: "MEX", group: "Host" },
+  { name: "USA", code: "USA", group: "Host" },
+  { name: "Japan", code: "JPN", group: "AFC" },
+  { name: "IR Iran", code: "IRN", group: "AFC" },
+  { name: "Uzbekistan", code: "UZB", group: "AFC" },
+  { name: "South Korea", code: "KOR", group: "AFC" },
+  { name: "Jordan", code: "JOR", group: "AFC" },
+  { name: "Australia", code: "AUS", group: "AFC" },
+  { name: "Qatar", code: "QAT", group: "AFC" },
+  { name: "Saudi Arabia", code: "KSA", group: "AFC" },
+  { name: "Iraq", code: "IRQ", group: "AFC" },
+  { name: "Morocco", code: "MAR", group: "CAF" },
+  { name: "Tunisia", code: "TUN", group: "CAF" },
+  { name: "Egypt", code: "EGY", group: "CAF" },
+  { name: "Algeria", code: "ALG", group: "CAF" },
+  { name: "Ghana", code: "GHA", group: "CAF" },
+  { name: "Ivory Coast", code: "CIV", group: "CAF" },
+  { name: "Senegal", code: "SEN", group: "CAF" },
+  { name: "South Africa", code: "RSA", group: "CAF" },
+  { name: "Cabo Verde", code: "CPV", group: "CAF" },
+  { name: "DR Congo", code: "COD", group: "CAF" },
+  { name: "Argentina", code: "ARG", group: "CONMEBOL" },
+  { name: "Brazil", code: "BRA", group: "CONMEBOL" },
+  { name: "Ecuador", code: "ECU", group: "CONMEBOL" },
+  { name: "Colombia", code: "COL", group: "CONMEBOL" },
+  { name: "Uruguay", code: "URU", group: "CONMEBOL" },
+  { name: "Paraguay", code: "PAR", group: "CONMEBOL" },
+  { name: "New Zealand", code: "NZL", group: "OFC" },
+  { name: "Panama", code: "PAN", group: "CONCACAF" },
+  { name: "Haiti", code: "HAI", group: "CONCACAF" },
+  { name: "Curacao", code: "CUW", group: "CONCACAF" },
+  { name: "England", code: "ENG", group: "UEFA" },
+  { name: "France", code: "FRA", group: "UEFA" },
+  { name: "Croatia", code: "CRO", group: "UEFA" },
+  { name: "Norway", code: "NOR", group: "UEFA" },
+  { name: "Portugal", code: "POR", group: "UEFA" },
+  { name: "Germany", code: "GER", group: "UEFA" },
+  { name: "Netherlands", code: "NED", group: "UEFA" },
+  { name: "Switzerland", code: "SUI", group: "UEFA" },
+  { name: "Scotland", code: "SCO", group: "UEFA" },
+  { name: "Spain", code: "ESP", group: "UEFA" },
+  { name: "Belgium", code: "BEL", group: "UEFA" },
+  { name: "Austria", code: "AUT", group: "UEFA" },
+  { name: "Turkey", code: "TUR", group: "UEFA" },
+  { name: "Czech Republic", code: "CZE", group: "UEFA" },
+  { name: "Sweden", code: "SWE", group: "UEFA" },
+  { name: "Bosnia and Herzegovina", code: "BIH", group: "UEFA" }
 ];
 
 const seedMarkets: Market[] = [
@@ -301,6 +362,8 @@ export default function Home() {
   const [walletError, setWalletError] = useState("");
   const [genBalance, setGenBalance] = useState("0.0000");
   const [walletChain, setWalletChain] = useState("");
+  const [selectedWallet, setSelectedWallet] = useState<WalletKind>("metamask");
+  const [walletName, setWalletName] = useState("MetaMask");
   const [createMarket, setCreateMarket] = useState<CreateMarketState>({
     title: "Will GenLayer ship a new public testnet milestone in Q3?",
     category: "AI",
@@ -689,23 +752,43 @@ export default function Home() {
     }
   }
 
-  async function connectWallet() {
+  function getWalletProvider(kind: WalletKind = selectedWallet): EthereumProvider | undefined {
+    const injected = window.ethereum;
+    const providers = injected?.providers ?? [];
+    if (kind === "okx") return window.okxwallet ?? providers.find((provider: any) => provider?.isOkxWallet) ?? injected;
+    if (kind === "rabby") return window.rabby ?? providers.find((provider: any) => provider?.isRabby) ?? injected;
+    return providers.find((provider: any) => provider?.isMetaMask && !provider?.isRabby && !provider?.isOkxWallet) ?? injected;
+  }
+
+  function walletLabel(kind: WalletKind = selectedWallet) {
+    return walletOptions.find((wallet) => wallet.id === kind)?.label ?? "Wallet";
+  }
+
+  async function connectWallet(kind: WalletKind = selectedWallet) {
+    setSelectedWallet(kind);
+    setWalletName(walletLabel(kind));
     setWalletError("");
-    if (!window.ethereum) {
-      setWalletError("Wallet not found");
-      setFeed((items) => ["Install MetaMask or another EVM wallet to connect", ...items].slice(0, 6));
+    const provider = getWalletProvider(kind);
+    if (!provider) {
+      const message = `${walletLabel(kind)} wallet not found`;
+      setWalletError(message);
+      setFeed((items) => [`Install or unlock ${walletLabel(kind)} to connect`, ...items].slice(0, 6));
       return;
     }
 
     try {
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const accounts = await provider.request({ method: "eth_requestAccounts" });
       const firstAccount = Array.isArray(accounts) && typeof accounts[0] === "string" ? accounts[0] : "";
       if (!firstAccount) throw new Error("No wallet account returned");
       setWalletAddress(firstAccount);
-      await ensureStudioNet();
-      checkGenLayerSnap().catch(() => null);
-      await refreshWalletState(firstAccount);
-      setFeed((items) => [`Wallet connected ${shortAddress(firstAccount)}`, ...items].slice(0, 6));
+      await ensureStudioNet(provider);
+      if (kind === "metamask") {
+        checkGenLayerSnap(provider).catch(() => null);
+      } else {
+        setWalletSnapReady(false);
+      }
+      await refreshWalletState(firstAccount, provider);
+      setFeed((items) => [`${walletLabel(kind)} connected ${shortAddress(firstAccount)}`, ...items].slice(0, 6));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Wallet connection rejected";
       setWalletError(message);
@@ -714,29 +797,30 @@ export default function Home() {
   }
 
   async function requestPrimaryAccount() {
-    const accounts = await window.ethereum?.request({ method: "eth_requestAccounts" });
+    const provider = getWalletProvider();
+    const accounts = await provider?.request({ method: "eth_requestAccounts" });
     const account = Array.isArray(accounts) && typeof accounts[0] === "string" ? accounts[0] : "";
     if (!account) throw new Error("Connect wallet first");
     setWalletAddress(account);
     return account;
   }
 
-  async function ensureStudioNet() {
-    if (!window.ethereum) throw new Error("Wallet not found");
-    const currentChainId = await window.ethereum.request({ method: "eth_chainId" });
+  async function ensureStudioNet(provider: EthereumProvider | undefined = getWalletProvider()) {
+    if (!provider) throw new Error("Wallet not found");
+    const currentChainId = await provider.request({ method: "eth_chainId" });
     if (currentChainId === STUDIO_CHAIN_ID) {
       setWalletChain("GenLayer StudioNet");
       return;
     }
 
     try {
-      await window.ethereum.request({
+      await provider.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: STUDIO_CHAIN_ID }]
       });
     } catch (error: any) {
       if (error?.code !== 4902) throw error;
-      await window.ethereum.request({
+      await provider.request({
         method: "wallet_addEthereumChain",
         params: [
           {
@@ -752,25 +836,30 @@ export default function Home() {
     setWalletChain("GenLayer StudioNet");
   }
 
-  async function checkGenLayerSnap() {
-    if (!window.ethereum) throw new Error("Wallet not found");
+  async function checkGenLayerSnap(provider: EthereumProvider | undefined = getWalletProvider("metamask")) {
+    if (!provider) throw new Error("MetaMask not found");
     try {
-      const snaps = await window.ethereum.request({ method: "wallet_getSnaps" });
+      const snaps = await provider.request({ method: "wallet_getSnaps" });
       const installed = Object.values((snaps ?? {}) as Record<string, any>).some((snap: any) => snap?.id === GENLAYER_SNAP_ID);
       setWalletSnapReady(installed);
       return installed;
     } catch {
       setWalletSnapReady(false);
-      throw new Error("This wallet does not support MetaMask Snaps. Use MetaMask with Snaps support, then install the GenLayer Snap from GenLayer Studio.");
+      throw new Error("MetaMask Snaps are required for GenLayer transaction signing. Rabby and OKX can connect for EVM account context, but GenLayer writes require MetaMask with the GenLayer Snap.");
     }
   }
 
   async function ensureGenLayerSnap() {
-    if (!window.ethereum) throw new Error("Wallet not found");
-    const installed = await checkGenLayerSnap();
+    if (selectedWallet !== "metamask") {
+      setWalletSnapReady(false);
+      throw new Error(`${walletLabel(selectedWallet)} is connected for account context. GenLayer write transactions require MetaMask with the GenLayer Snap.`);
+    }
+    const provider = getWalletProvider("metamask");
+    if (!provider) throw new Error("MetaMask not found");
+    const installed = await checkGenLayerSnap(provider);
     if (installed) return;
     try {
-      await window.ethereum.request({
+      await provider.request({
         method: "wallet_requestSnaps",
         params: {
           [GENLAYER_SNAP_ID]: {}
@@ -783,11 +872,11 @@ export default function Home() {
     }
   }
 
-  async function refreshWalletState(account: string) {
-    if (!window.ethereum) return;
+  async function refreshWalletState(account: string, provider: EthereumProvider | undefined = getWalletProvider()) {
+    if (!provider) return;
     const [balanceHex, chainId] = await Promise.all([
-      window.ethereum.request({ method: "eth_getBalance", params: [account, "latest"] }),
-      window.ethereum.request({ method: "eth_chainId" })
+      provider.request({ method: "eth_getBalance", params: [account, "latest"] }),
+      provider.request({ method: "eth_chainId" })
     ]);
     if (typeof balanceHex === "string") {
       setGenBalance(formatGEN(BigInt(balanceHex)));
@@ -867,10 +956,24 @@ export default function Home() {
           <Search size={14} />
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search markets..." />
         </label>
-        <button className="deposit pulse-action" onClick={connectWallet}><Wallet size={16} />{walletAddress ? "Connected" : "Connect"}</button>
+        <div className="wallet-select">
+          {walletOptions.map((wallet) => (
+            <button
+              key={wallet.id}
+              className={selectedWallet === wallet.id ? "active" : ""}
+              onClick={() => connectWallet(wallet.id)}
+              type="button"
+            >
+              {wallet.label}
+            </button>
+          ))}
+        </div>
+        <button className="deposit pulse-action" onClick={() => connectWallet(selectedWallet)}>
+          <Wallet size={16} />{walletAddress ? `${walletName} connected` : "Connect"}
+        </button>
         <div className="wallet-pill">{genBalance} GEN</div>
         <div className="wallet-pill">{walletChain || "StudioNet"}</div>
-        <button className={walletError ? "wallet-address wallet-alert" : "wallet-address"} onClick={connectWallet}>
+        <button className={walletError ? "wallet-address wallet-alert" : "wallet-address"} onClick={() => connectWallet(selectedWallet)}>
           {walletAddress ? shortAddress(walletAddress) : walletError || (dataStatus === "loading" ? "Loading API" : dataStatus === "live" ? "API Live" : "Seed data")}
         </button>
       </header>
@@ -989,7 +1092,7 @@ export default function Home() {
                   </button>
                   {walletSnapReady === false && (
                     <a className="snap-help" href={GENLAYER_STUDIO_URL} target="_blank" rel="noreferrer">
-                      Open GenLayer Studio to enable the GenLayer Snap
+                      {selectedWallet === "metamask" ? "Open GenLayer Studio to enable the GenLayer Snap" : `${walletName} connected. Use MetaMask + GenLayer Snap to submit GenLayer writes.`}
                     </a>
                   )}
                   {tradeStatus && <span className="api-note">{tradeStatus}</span>}
@@ -1076,7 +1179,11 @@ function FootballEventBoard({
   const headline = worldCupImages[market.id % worldCupImages.length];
   const eventCards = worldCupImages.map((event, index) => ({
     ...event,
-    label: index === 0 ? "Winner market" : index === 1 ? "Player props" : "Host edge"
+    label: ["Winner market", "Player props", "Host edge", "Debutants", "Group math", "Final path"][index] ?? "Market"
+  }));
+  const confederationSummary = ["Host", "AFC", "CAF", "CONCACAF", "CONMEBOL", "OFC", "UEFA"].map((group) => ({
+    group,
+    count: worldCupTeams.filter((team) => team.group === group).length
   }));
 
   return (
@@ -1100,12 +1207,17 @@ function FootballEventBoard({
       <div className="qualified-teams">
         <div>
           <span>Verified participant board</span>
-          <strong>World Cup 2026 teams</strong>
+          <strong>World Cup 2026 teams ({worldCupTeams.length})</strong>
+        </div>
+        <div className="confed-summary">
+          {confederationSummary.map((item) => (
+            <span key={item.group}><strong>{item.count}</strong>{item.group}</span>
+          ))}
         </div>
         <div className="team-strip">
           {worldCupTeams.map((team) => (
             <button key={team.name} type="button">
-              <span>{team.flag}</span>
+              <span>{team.code}</span>
               <strong>{team.name}</strong>
               <em>{team.group}</em>
             </button>
