@@ -106,7 +106,50 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   return NextResponse.json({
     source: "predicto-api",
+    contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? null,
+    network: process.env.NEXT_PUBLIC_GENLAYER_CHAIN ?? "studionet",
     updatedAt: new Date().toISOString(),
     markets
   });
+}
+
+export async function POST(request: Request) {
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body.title !== "string" || body.title.trim().length < 8) {
+    return NextResponse.json({ error: "Market title must be at least 8 characters." }, { status: 400 });
+  }
+  if (typeof body.category !== "string" || body.category.trim().length < 2) {
+    return NextResponse.json({ error: "Category is required." }, { status: 400 });
+  }
+  if (typeof body.outcomes !== "string" || body.outcomes.split(",").filter(Boolean).length < 2) {
+    return NextResponse.json({ error: "Provide at least two comma-separated outcomes." }, { status: 400 });
+  }
+
+  const outcomeNames = body.outcomes
+    .split(",")
+    .map((item: string) => item.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+
+  const market = {
+    id: Date.now(),
+    title: body.title.trim(),
+    category: body.category.trim(),
+    tag: body.tag?.trim() || "Community",
+    volume: "$0.00",
+    liquidity: "$0.00",
+    closes: body.closes?.trim() || "Open",
+    outcomes: outcomeNames.map((name: string, index: number) => ({
+      name,
+      price: Math.max(5, Math.round(100 / outcomeNames.length) - index),
+      change: "+0.0%",
+      side: "up"
+    })),
+    spark: [18, 20, 19, 22, 24, 23, 25, 27, 26, 28, 29, 30],
+    note:
+      body.rules?.trim() ||
+      "Community market created from the Predicto Arena terminal. Resolution should be checked against public sources and GenLayer oracle review."
+  };
+
+  return NextResponse.json({ source: "predicto-api", market }, { status: 201 });
 }

@@ -15,6 +15,15 @@ type Market = {
   note: string;
 };
 
+type CreateMarketState = {
+  title: string;
+  category: string;
+  tag: string;
+  closes: string;
+  outcomes: string;
+  rules: string;
+};
+
 type EthereumProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
   on?: (event: string, handler: (...args: any[]) => void) => void;
@@ -165,6 +174,19 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [walletError, setWalletError] = useState("");
+  const [createMarket, setCreateMarket] = useState<CreateMarketState>({
+    title: "Will GenLayer ship a new public testnet milestone in Q3?",
+    category: "AI",
+    tag: "GenLayer",
+    closes: "Sep 30, 2026",
+    outcomes: "Yes, No",
+    rules: "Resolve Yes if GenLayer publishes an official public testnet milestone announcement before the close date. Otherwise resolve No."
+  });
+  const [creatingMarket, setCreatingMarket] = useState(false);
+  const [tradeStatus, setTradeStatus] = useState("");
+  const [aiQuestion, setAiQuestion] = useState("Explain the resolution risk for this market.");
+  const [aiAnswer, setAiAnswer] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
   const [feed, setFeed] = useState<string[]>(["Market terminal online", "Oracle route: GenLayer web consensus", "Wallet simulation ready"]);
 
   useEffect(() => {
@@ -232,8 +254,76 @@ export default function Home() {
     setFeed((items) => [`Opened ${market.title}`, ...items].slice(0, 6));
   }
 
-  function submitTrade() {
-    setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} on ${activeMarket.title} for $${amount || "0"}`, ...items].slice(0, 6));
+  async function submitTrade() {
+    setTradeStatus("Submitting trade...");
+    try {
+      const response = await fetch("/api/trades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          marketId: activeMarket.id,
+          outcome: tradeOutcome,
+          side: tradeSide,
+          amount: Number(amount || 0),
+          wallet: walletAddress
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Trade API failed");
+      setTradeStatus(`Accepted ${result.ticketId}`);
+      setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} for $${amount || "0"} via API`, ...items].slice(0, 6));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Trade failed";
+      setTradeStatus(message);
+      setFeed((items) => [`Trade error: ${message}`, ...items].slice(0, 6));
+    }
+  }
+
+  async function submitMarket() {
+    setCreatingMarket(true);
+    try {
+      const response = await fetch("/api/markets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createMarket)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Market API failed");
+      const nextMarket = result.market as Market;
+      setMarketData((items) => [nextMarket, ...items]);
+      setActiveMarketId(nextMarket.id);
+      setTradeOutcome(nextMarket.outcomes[0]?.name ?? "");
+      setActiveNav("Markets");
+      setDrawerTab("Rules");
+      setFeed((items) => [`Created market via API: ${nextMarket.title}`, ...items].slice(0, 6));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Market creation failed";
+      setFeed((items) => [`Create market error: ${message}`, ...items].slice(0, 6));
+    } finally {
+      setCreatingMarket(false);
+    }
+  }
+
+  async function askAi() {
+    setAiLoading(true);
+    setAiAnswer("");
+    try {
+      const response = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: aiQuestion, market: activeMarket, markets: marketData })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "AI request failed");
+      setAiAnswer(result.answer);
+      setFeed((items) => [`AI analyzed ${activeMarket.title}`, ...items].slice(0, 6));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI request failed";
+      setAiAnswer(message);
+      setFeed((items) => [`AI error: ${message}`, ...items].slice(0, 6));
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   async function connectWallet() {
@@ -282,7 +372,7 @@ export default function Home() {
         {categories.map((category) => (
           <button key={category} className={activeCategory === category ? "selected" : ""} onClick={() => setActiveCategory(category)}>{category}</button>
         ))}
-        <button className="new-market">Create market</button>
+        <button className="new-market" onClick={() => setActiveNav("Create")}>Create market</button>
       </section>
 
       {activeNav === "Markets" && (
@@ -385,6 +475,7 @@ export default function Home() {
                     <span>Max payout</span><strong>${(estimatedShares).toFixed(2)}</strong>
                   </div>
                   <button className="submit-trade" onClick={submitTrade}>{tradeSide === "buy" ? "Buy shares" : "Sell shares"}</button>
+                  {tradeStatus && <span className="api-note">{tradeStatus}</span>}
                 </div>
               )}
               {drawerTab === "Book" && <OrderBook market={activeMarket} />}
@@ -401,10 +492,25 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            <AiPanel
+              question={aiQuestion}
+              answer={aiAnswer}
+              loading={aiLoading}
+              onQuestion={setAiQuestion}
+              onAsk={askAi}
+            />
           </aside>
         </section>
       )}
 
+      {activeNav === "Create" && (
+        <CreateMarketView
+          value={createMarket}
+          busy={creatingMarket}
+          onChange={setCreateMarket}
+          onSubmit={submitMarket}
+        />
+      )}
       {activeNav === "Portfolio" && <Portfolio feed={feed} />}
       {activeNav === "Leaderboard" && <Leaderboard />}
       {activeNav === "Earn Tickets" && <Tickets />}
@@ -416,6 +522,64 @@ export default function Home() {
         <span>GenLayer oracle simulation</span>
       </footer>
     </main>
+  );
+}
+
+function AiPanel({
+  question,
+  answer,
+  loading,
+  onQuestion,
+  onAsk
+}: {
+  question: string;
+  answer: string;
+  loading: boolean;
+  onQuestion: (value: string) => void;
+  onAsk: () => void;
+}) {
+  return (
+    <div className="ai-panel">
+      <h2>AI market analyst</h2>
+      <textarea value={question} onChange={(event) => onQuestion(event.target.value)} />
+      <button onClick={onAsk} disabled={loading}>{loading ? "Analyzing..." : "Ask AI"}</button>
+      {answer && <p>{answer}</p>}
+    </div>
+  );
+}
+
+function CreateMarketView({
+  value,
+  busy,
+  onChange,
+  onSubmit
+}: {
+  value: CreateMarketState;
+  busy: boolean;
+  onChange: (value: CreateMarketState) => void;
+  onSubmit: () => void;
+}) {
+  function update(field: keyof CreateMarketState, nextValue: string) {
+    onChange({ ...value, [field]: nextValue });
+  }
+
+  return (
+    <section className="create-view">
+      <div className="create-head">
+        <span className="micro">Market factory</span>
+        <h1>Create prediction market</h1>
+        <p>Draft a market, define outcomes, and submit it through the Predicto API. The GenLayer contract mirrors the same create and resolve flow on-chain.</p>
+      </div>
+      <div className="create-form">
+        <label>Title<input value={value.title} onChange={(event) => update("title", event.target.value)} /></label>
+        <label>Category<input value={value.category} onChange={(event) => update("category", event.target.value)} /></label>
+        <label>Tag<input value={value.tag} onChange={(event) => update("tag", event.target.value)} /></label>
+        <label>Close date<input value={value.closes} onChange={(event) => update("closes", event.target.value)} /></label>
+        <label className="wide">Outcomes<input value={value.outcomes} onChange={(event) => update("outcomes", event.target.value)} /></label>
+        <label className="wide">Resolution rules<textarea value={value.rules} onChange={(event) => update("rules", event.target.value)} /></label>
+        <button onClick={onSubmit} disabled={busy}>{busy ? "Creating..." : "Create market via API"}</button>
+      </div>
+    </section>
   );
 }
 

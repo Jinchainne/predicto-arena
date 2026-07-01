@@ -20,12 +20,16 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 - Nested drawer tabs for Trade, Book, Rules, and Oracle.
 - Portfolio, Leaderboard, and Earn Tickets sections.
 - Market data API at `/api/markets` with frontend hydration and seed fallback.
+- Market creation API through `POST /api/markets`.
+- Trade ticket API through `POST /api/trades`.
 - EVM wallet connection through `window.ethereum` for MetaMask-compatible wallets.
-- Server-side AI route ready for market explanation and oracle analysis.
+- In-app AI market analyst through `/api/ask` for market explanation and oracle analysis.
 
 ## GenLayer Fit
 
 Prediction markets need transparent resolution. Predicto Arena is built around a GenLayer-style oracle flow where public sources, market rules, and AI-assisted evidence review can be used to resolve outcomes with stronger transparency than a centralized moderator.
+
+The deployed GenLayer contract supports market creation, position buying, public-source resolution, and view methods for markets, outcomes, and positions.
 
 ## Run Locally
 
