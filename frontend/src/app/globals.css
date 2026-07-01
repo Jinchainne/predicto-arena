@@ -262,12 +262,12 @@ svg { flex-shrink: 0; }
   right: 0;
   bottom: 34px;
   pointer-events: none;
-  opacity: .38;
+  opacity: .62;
   background:
-    radial-gradient(circle at 18% 30%, rgba(239,60,255,.14), transparent 18%),
-    radial-gradient(circle at 82% 58%, rgba(74,222,128,.08), transparent 20%),
-    linear-gradient(90deg, transparent 0 47%, rgba(239,60,255,.08) 48% 52%, transparent 53%),
-    repeating-linear-gradient(115deg, transparent 0 34px, rgba(255,255,255,.035) 35px, transparent 36px);
+    radial-gradient(circle at 18% 30%, rgba(239,60,255,.24), transparent 20%),
+    radial-gradient(circle at 82% 58%, rgba(74,222,128,.16), transparent 22%),
+    linear-gradient(90deg, transparent 0 47%, rgba(239,60,255,.16) 48% 52%, transparent 53%),
+    repeating-linear-gradient(115deg, transparent 0 28px, rgba(255,255,255,.055) 29px, transparent 31px);
   animation: oracleDrift 18s ease-in-out infinite;
   z-index: 0;
 }
@@ -279,12 +279,12 @@ svg { flex-shrink: 0; }
   top: 22vh;
   height: 52vh;
   pointer-events: none;
-  opacity: .28;
+  opacity: .48;
   background:
     linear-gradient(90deg, transparent, rgba(239,60,255,.22), transparent) 0 20% / 100% 1px no-repeat,
     linear-gradient(90deg, transparent, rgba(74,222,128,.18), transparent) 0 58% / 100% 1px no-repeat,
-    radial-gradient(circle, rgba(239,60,255,.45) 0 2px, transparent 3px) 12% 26% / 160px 120px,
-    radial-gradient(circle, rgba(74,222,128,.42) 0 2px, transparent 3px) 86% 64% / 180px 140px;
+    radial-gradient(circle, rgba(239,60,255,.7) 0 2px, transparent 3px) 12% 26% / 130px 96px,
+    radial-gradient(circle, rgba(74,222,128,.65) 0 2px, transparent 3px) 86% 64% / 150px 110px;
   filter: blur(.1px);
   animation: oraclePulse 5.5s ease-in-out infinite;
   z-index: 0;
@@ -329,10 +329,14 @@ p { color: var(--muted); }
   padding: 16px;
 }
 .feature-grid.football-grid {
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
 .outcome-stack { display: grid; gap: 10px; }
+.football-picker {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-column: 1 / -1;
+}
 .outcome {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -344,6 +348,23 @@ p { color: var(--muted); }
   background: rgba(255,255,255,.04);
   color: var(--text);
   transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+.outcome b {
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 400;
+}
+.football-picker .outcome {
+  min-height: 94px;
+  grid-template-columns: auto 1fr auto auto;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(239,60,255,.16), transparent 32%),
+    rgba(255,255,255,.045);
+}
+.football-picker .outcome.selected {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(239,60,255,.32), transparent 34%),
+    rgba(239,60,255,.13);
 }
 .outcome:hover { transform: translateX(4px); }
 .outcome.selected { border-color: rgba(239,60,255,.65); background: rgba(239,60,255,.12); }
@@ -507,6 +528,12 @@ p { color: var(--muted); }
   text-align: left;
 }
 .team-strip button span { color: var(--gold); font-weight: 900; }
+.team-strip button span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+}
 .team-strip button strong {
   font-size: 13px;
   line-height: 1.15;
@@ -1010,13 +1037,13 @@ p { color: var(--muted); }
 }
 
 @keyframes oracleDrift {
-  0%, 100% { transform: translate3d(0,0,0); opacity: .32; }
-  50% { transform: translate3d(0,-18px,0); opacity: .48; }
+  0%, 100% { transform: translate3d(0,0,0); opacity: .48; }
+  50% { transform: translate3d(0,-18px,0); opacity: .7; }
 }
 
 @keyframes oraclePulse {
-  0%, 100% { transform: scale(1); opacity: .18; }
-  50% { transform: scale(1.03); opacity: .36; }
+  0%, 100% { transform: scale(1); opacity: .3; }
+  50% { transform: scale(1.03); opacity: .56; }
 }
 
 @keyframes marqueeGlow {
@@ -1065,6 +1092,7 @@ p { color: var(--muted); }
   .category-hero { grid-template-columns: 1fr; }
   .market-grid, .tickets-view, .create-form, .outcome-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .football-events, .clip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .football-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .team-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .confed-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
@@ -1074,6 +1102,7 @@ p { color: var(--muted); }
   .market-shell { padding: 0 12px; }
   .market-grid, .tickets-view, .create-form, .outcome-board { grid-template-columns: 1fr; }
   .football-events, .clip-grid, .team-strip { grid-template-columns: 1fr; }
+  .football-picker { grid-template-columns: 1fr; }
   .confed-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .volume-board button { grid-template-columns: 1fr; }
   .section-title { align-items: flex-start; flex-direction: column; gap: 10px; }

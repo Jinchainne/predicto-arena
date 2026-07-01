@@ -244,6 +244,57 @@ const worldCupTeams = [
   { name: "Bosnia and Herzegovina", code: "BIH", group: "UEFA" }
 ];
 
+const countryFlags: Record<string, string> = {
+  CAN: "🇨🇦",
+  MEX: "🇲🇽",
+  USA: "🇺🇸",
+  JPN: "🇯🇵",
+  IRN: "🇮🇷",
+  UZB: "🇺🇿",
+  KOR: "🇰🇷",
+  JOR: "🇯🇴",
+  AUS: "🇦🇺",
+  QAT: "🇶🇦",
+  KSA: "🇸🇦",
+  IRQ: "🇮🇶",
+  MAR: "🇲🇦",
+  TUN: "🇹🇳",
+  EGY: "🇪🇬",
+  ALG: "🇩🇿",
+  GHA: "🇬🇭",
+  CIV: "🇨🇮",
+  SEN: "🇸🇳",
+  RSA: "🇿🇦",
+  CPV: "🇨🇻",
+  COD: "🇨🇩",
+  ARG: "🇦🇷",
+  BRA: "🇧🇷",
+  ECU: "🇪🇨",
+  COL: "🇨🇴",
+  URU: "🇺🇾",
+  PAR: "🇵🇾",
+  NZL: "🇳🇿",
+  PAN: "🇵🇦",
+  HAI: "🇭🇹",
+  CUW: "🇨🇼",
+  ENG: "🏴",
+  FRA: "🇫🇷",
+  CRO: "🇭🇷",
+  NOR: "🇳🇴",
+  POR: "🇵🇹",
+  GER: "🇩🇪",
+  NED: "🇳🇱",
+  SUI: "🇨🇭",
+  SCO: "🏴",
+  ESP: "🇪🇸",
+  BEL: "🇧🇪",
+  AUT: "🇦🇹",
+  TUR: "🇹🇷",
+  CZE: "🇨🇿",
+  SWE: "🇸🇪",
+  BIH: "🇧🇦"
+};
+
 const seedMarkets: Market[] = [
   {
     id: 101,
@@ -1039,13 +1090,14 @@ export default function Home() {
                 <button onClick={openTradeTicket}><Activity size={16} />Trade now</button>
               </div>
               <div className={activeIsFootball ? "feature-grid football-grid" : "feature-grid"}>
-                <div className="outcome-stack">
+                <div className={activeIsFootball ? "outcome-stack football-picker" : "outcome-stack"}>
                   {activeMarket.outcomes.map((outcome) => (
                     <button
                       key={outcome.name}
                       className={tradeOutcome === outcome.name ? "outcome selected" : "outcome"}
                       onClick={() => setTradeOutcome(outcome.name)}
                     >
+                      {activeIsFootball && <b>{flagForTeam(outcome.name)}</b>}
                       <span>{outcome.name}</span>
                       <strong>{outcome.price}c</strong>
                       <em className={outcome.side}>{outcome.change}</em>
@@ -1271,7 +1323,7 @@ function FootballEventBoard({
         <div className="team-strip">
           {worldCupTeams.map((team) => (
             <button key={team.name} type="button">
-              <span>{team.code}</span>
+              <span>{countryFlags[team.code] ?? "🏳️"} {team.code}</span>
               <strong>{team.name}</strong>
               <em>{team.group}</em>
             </button>
@@ -1458,6 +1510,17 @@ function inferWeatherLocation(market: Market, outcome: string) {
 
 function isFootballMarket(market: Market) {
   return market.category === "World Cup" || market.category === "Sports" || market.tag === "Football";
+}
+
+function flagForTeam(name: string) {
+  const normalized = name.toLowerCase();
+  const team = worldCupTeams.find((item) => item.name.toLowerCase() === normalized);
+  if (team) return countryFlags[team.code] ?? "🏳️";
+  if (normalized.includes("france")) return "🇫🇷";
+  if (normalized.includes("argentina")) return "🇦🇷";
+  if (normalized.includes("brazil")) return "🇧🇷";
+  if (normalized.includes("england")) return "🏴";
+  return "⚽";
 }
 
 function formatWeatherValue(value: number | undefined, unit = "") {
