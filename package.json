@@ -1,0 +1,33 @@
+{
+  "name": "predicto-arena",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GenLayer Intelligent Contract project for prediction markets and oracle-assisted resolution.",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "typecheck": "npm --prefix frontend run typecheck",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
+    "frontend:typecheck": "npm --prefix frontend run typecheck",
+    "contract:syntax": "python -m py_compile contracts/predicto_arena.py",
+    "contract:lint": "genvm-lint check contracts/predicto_arena.py",
+    "deploy:cli": "genlayer deploy --contract contracts/predicto_arena.py",
+    "deploy:sdk": "tsx scripts/deploy.ts",
+    "test": "python -m py_compile contracts/predicto_arena.py && npm --prefix frontend run typecheck"
+  },
+  "dependencies": {
+    "@types/node": "^20.19.43",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "genlayer-js": "latest",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.5"
+  }
+}
