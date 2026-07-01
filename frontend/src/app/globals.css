@@ -97,10 +97,19 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 }
 .wallet-pill, .wallet-address {
   background: rgba(255,255,255,.06);
+  border: 0;
   border-radius: 10px;
+  color: var(--text);
   padding: 11px 14px;
   font-weight: 900;
   white-space: nowrap;
+}
+.wallet-address {
+  text-align: center;
+}
+.wallet-alert {
+  background: rgba(251,113,133,.16);
+  color: #ffc1cc;
 }
 
 .category-strip {

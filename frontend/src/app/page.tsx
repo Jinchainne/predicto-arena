@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Market = {
   id: number;
@@ -15,10 +15,22 @@ type Market = {
   note: string;
 };
 
+type EthereumProvider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  on?: (event: string, handler: (...args: any[]) => void) => void;
+  removeListener?: (event: string, handler: (...args: any[]) => void) => void;
+};
+
+declare global {
+  interface Window {
+    ethereum?: EthereumProvider;
+  }
+}
+
 const categories = ["All", "World Cup", "Crypto", "AI", "Politics", "Economy", "Sports", "Culture", "New"];
 const navItems = ["Markets", "Portfolio", "Leaderboard", "Earn Tickets"];
 
-const markets: Market[] = [
+const seedMarkets: Market[] = [
   {
     id: 101,
     title: "2026 World Cup Winner",
@@ -143,23 +155,73 @@ function sparkPath(values: number[]) {
 export default function Home() {
   const [activeNav, setActiveNav] = useState("Markets");
   const [activeCategory, setActiveCategory] = useState("All");
-  const [activeMarketId, setActiveMarketId] = useState(markets[0].id);
-  const [tradeOutcome, setTradeOutcome] = useState(markets[0].outcomes[0].name);
+  const [marketData, setMarketData] = useState<Market[]>(seedMarkets);
+  const [dataStatus, setDataStatus] = useState<"loading" | "live" | "fallback">("loading");
+  const [activeMarketId, setActiveMarketId] = useState(seedMarkets[0].id);
+  const [tradeOutcome, setTradeOutcome] = useState(seedMarkets[0].outcomes[0].name);
   const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("25");
   const [drawerTab, setDrawerTab] = useState("Trade");
   const [search, setSearch] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [walletError, setWalletError] = useState("");
   const [feed, setFeed] = useState<string[]>(["Market terminal online", "Oracle route: GenLayer web consensus", "Wallet simulation ready"]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMarkets() {
+      try {
+        const response = await fetch("/api/markets", { cache: "no-store" });
+        if (!response.ok) throw new Error("Market API failed");
+        const payload = await response.json();
+        const nextMarkets = Array.isArray(payload.markets) ? payload.markets : [];
+        if (!cancelled && nextMarkets.length > 0) {
+          setMarketData(nextMarkets);
+          setActiveMarketId(nextMarkets[0].id);
+          setTradeOutcome(nextMarkets[0].outcomes[0]?.name ?? "");
+          setDataStatus("live");
+          setFeed((items) => ["Loaded live market API data", ...items].slice(0, 6));
+        }
+      } catch {
+        if (!cancelled) {
+          setDataStatus("fallback");
+          setFeed((items) => ["Market API unavailable, using seed market data", ...items].slice(0, 6));
+        }
+      }
+    }
+
+    loadMarkets();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!window.ethereum?.on) return;
+    const handleAccountsChanged = (...args: any[]) => {
+      const accounts = Array.isArray(args[0]) ? args[0] : [];
+      const nextAddress = typeof accounts[0] === "string" ? accounts[0] : "";
+      setWalletAddress(nextAddress);
+      if (nextAddress) {
+        setWalletError("");
+        setFeed((items) => [`Wallet connected ${shortAddress(nextAddress)}`, ...items].slice(0, 6));
+      }
+    };
+
+    window.ethereum.on("accountsChanged", handleAccountsChanged);
+    return () => window.ethereum?.removeListener?.("accountsChanged", handleAccountsChanged);
+  }, []);
+
   const filteredMarkets = useMemo(() => {
-    return markets.filter((market) => {
+    return marketData.filter((market) => {
       const categoryMatch = activeCategory === "All" || market.category === activeCategory || market.tag === activeCategory;
       const searchMatch = market.title.toLowerCase().includes(search.toLowerCase());
       return categoryMatch && searchMatch;
     });
-  }, [activeCategory, search]);
+  }, [activeCategory, marketData, search]);
 
-  const activeMarket = markets.find((market) => market.id === activeMarketId) ?? markets[0];
+  const activeMarket = marketData.find((market) => market.id === activeMarketId) ?? marketData[0] ?? seedMarkets[0];
   const selectedOutcome = activeMarket.outcomes.find((outcome) => outcome.name === tradeOutcome) ?? activeMarket.outcomes[0];
   const estimatedShares = Number(amount || 0) / Math.max(1, selectedOutcome.price / 100);
 
@@ -172,6 +234,27 @@ export default function Home() {
 
   function submitTrade() {
     setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} on ${activeMarket.title} for $${amount || "0"}`, ...items].slice(0, 6));
+  }
+
+  async function connectWallet() {
+    setWalletError("");
+    if (!window.ethereum) {
+      setWalletError("Wallet not found");
+      setFeed((items) => ["Install MetaMask or another EVM wallet to connect", ...items].slice(0, 6));
+      return;
+    }
+
+    try {
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const firstAccount = Array.isArray(accounts) && typeof accounts[0] === "string" ? accounts[0] : "";
+      if (!firstAccount) throw new Error("No wallet account returned");
+      setWalletAddress(firstAccount);
+      setFeed((items) => [`Wallet connected ${shortAddress(firstAccount)}`, ...items].slice(0, 6));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Wallet connection rejected";
+      setWalletError(message);
+      setFeed((items) => [`Wallet error: ${message}`, ...items].slice(0, 6));
+    }
   }
 
   return (
@@ -187,10 +270,12 @@ export default function Home() {
           <span>Search</span>
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search markets..." />
         </label>
-        <button className="deposit">+ Deposit</button>
+        <button className="deposit" onClick={connectWallet}>{walletAddress ? "Connected" : "+ Connect"}</button>
         <div className="wallet-pill">$0.06 Bal</div>
         <div className="wallet-pill">$0.00 U.PnL</div>
-        <div className="wallet-address">0x753...A7Dd</div>
+        <button className={walletError ? "wallet-address wallet-alert" : "wallet-address"} onClick={connectWallet}>
+          {walletAddress ? shortAddress(walletAddress) : walletError || (dataStatus === "loading" ? "Loading API" : dataStatus === "live" ? "API Live" : "Seed data")}
+        </button>
       </header>
 
       <section className="category-strip">
@@ -309,7 +394,7 @@ export default function Home() {
 
             <div className="side-feed">
               <h2>New markets</h2>
-              {markets.slice(1, 6).map((market) => (
+              {marketData.slice(1, 6).map((market) => (
                 <button key={market.id} onClick={() => selectMarket(market)}>
                   <strong>{market.title}</strong>
                   <span>{market.volume} / {market.tag}</span>
@@ -332,6 +417,10 @@ export default function Home() {
       </footer>
     </main>
   );
+}
+
+function shortAddress(address: string) {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
 function OrderBook({ market }: { market: Market }) {

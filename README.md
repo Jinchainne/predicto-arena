@@ -19,6 +19,8 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 - Trade ticket with buy/sell side, amount, estimated shares, and payout.
 - Nested drawer tabs for Trade, Book, Rules, and Oracle.
 - Portfolio, Leaderboard, and Earn Tickets sections.
+- Market data API at `/api/markets` with frontend hydration and seed fallback.
+- EVM wallet connection through `window.ethereum` for MetaMask-compatible wallets.
 - Server-side AI route ready for market explanation and oracle analysis.
 
 ## GenLayer Fit
