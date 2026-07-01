@@ -969,7 +969,10 @@ export default function Home() {
   return (
     <main className="terminal">
       <header className="topbar">
-        <div className="logo-mark"><span /></div>
+        <div className="brand-lockup" aria-label="Predicto Arena">
+          <div className="logo-mark"><span /></div>
+          <strong>Predicto</strong>
+        </div>
         <nav className="main-nav">
           {navItems.map((item) => {
             const Icon = navIcons[item as keyof typeof navIcons];
