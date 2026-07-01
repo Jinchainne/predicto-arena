@@ -1,4 +1,4 @@
-# v0.4.0
+# v0.5.0
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 from genlayer import *
 
@@ -14,7 +14,7 @@ class Contract(gl.Contract):
     market_category: TreeMap[u256, str]
     market_rules: TreeMap[u256, str]
     market_source_url: TreeMap[u256, str]
-    market_status: TreeMap[u256, str]  # OPEN, RESOLVED, CANCELED
+    market_status: TreeMap[u256, str]  # OPEN, PAUSED, RESOLVING, RESOLVED, CANCELED
     market_outcome_count: TreeMap[u256, u256]
     market_resolved_outcome: TreeMap[u256, u256]
     market_resolution_note: TreeMap[u256, str]
@@ -22,6 +22,8 @@ class Contract(gl.Contract):
     market_volume_cents: TreeMap[u256, u256]
     market_liquidity_cents: TreeMap[u256, u256]
     market_fee_cents: TreeMap[u256, u256]
+    market_evidence_count: TreeMap[u256, u256]
+    market_dispute_count: TreeMap[u256, u256]
 
     # Key format: market_id * 100000 + outcome_index
     outcome_name: TreeMap[u256, str]
@@ -29,6 +31,12 @@ class Contract(gl.Contract):
     user_position_cents: TreeMap[str, u256]
     user_liquidity_cents: TreeMap[str, u256]
     user_claimed_cents: TreeMap[str, u256]
+    evidence_url: TreeMap[u256, str]
+    evidence_note: TreeMap[u256, str]
+    evidence_submitter: TreeMap[u256, Address]
+    dispute_note: TreeMap[u256, str]
+    dispute_submitter: TreeMap[u256, Address]
+    dispute_status: TreeMap[u256, str]
 
     def __init__(self):
         self.owner = gl.message.sender_address
@@ -42,6 +50,12 @@ class Contract(gl.Contract):
 
     def _liquidity_key(self, market_id: u256, user: Address) -> str:
         return str(market_id) + ":LP:" + str(user)
+
+    def _evidence_key(self, market_id: u256, evidence_index: u256) -> u256:
+        return market_id * u256(100000) + evidence_index
+
+    def _dispute_key(self, market_id: u256, dispute_index: u256) -> u256:
+        return market_id * u256(100000) + dispute_index
 
     def _external_key(self, external_id: str) -> str:
         return self._clip(external_id.strip(), 80)
@@ -119,6 +133,11 @@ class Contract(gl.Contract):
         self.market_resolved_outcome[market_id] = u256(0)
         self.market_resolution_note[market_id] = "Market created. AMM trading is open."
         self.market_fee_bps[market_id] = u256(35)
+        self.market_evidence_count[market_id] = u256(1)
+        first_evidence_key = self._evidence_key(market_id, u256(1))
+        self.evidence_url[first_evidence_key] = self._clip(source_url, 500)
+        self.evidence_note[first_evidence_key] = "Primary resolution source provided at market creation."
+        self.evidence_submitter[first_evidence_key] = gl.message.sender_address
 
         count = u256(0)
         current = ""
@@ -279,6 +298,80 @@ class Contract(gl.Contract):
         self._add_liquidity(mid, u256(amount_cents))
 
     @gl.public.write
+    def add_evidence(self, market_id: int, url: str, note: str) -> u256:
+        mid = u256(market_id)
+        if mid == u256(0) or mid > self.market_count:
+            raise UserError("Invalid market id")
+        if self.market_status[mid] == "CANCELED":
+            raise UserError("Market is canceled")
+        if not self._is_valid_url(url):
+            raise UserError("Evidence URL must be valid")
+        if len(note) < 10:
+            raise UserError("Evidence note is too short")
+
+        self.market_evidence_count[mid] += u256(1)
+        evidence_index = self.market_evidence_count[mid]
+        key = self._evidence_key(mid, evidence_index)
+        self.evidence_url[key] = self._clip(url, 500)
+        self.evidence_note[key] = self._clip(note, 700)
+        self.evidence_submitter[key] = gl.message.sender_address
+        return evidence_index
+
+    @gl.public.write
+    def open_dispute(self, market_id: int, note: str) -> u256:
+        mid = u256(market_id)
+        if mid == u256(0) or mid > self.market_count:
+            raise UserError("Invalid market id")
+        if self.market_status[mid] != "RESOLVED":
+            raise UserError("Only resolved markets can be disputed")
+        if len(note) < 20:
+            raise UserError("Dispute note is too short")
+
+        self.market_dispute_count[mid] += u256(1)
+        dispute_index = self.market_dispute_count[mid]
+        key = self._dispute_key(mid, dispute_index)
+        self.dispute_note[key] = self._clip(note, 900)
+        self.dispute_submitter[key] = gl.message.sender_address
+        self.dispute_status[key] = "OPEN"
+        return dispute_index
+
+    @gl.public.write
+    def pause_market(self, market_id: int) -> None:
+        mid = u256(market_id)
+        if mid == u256(0) or mid > self.market_count:
+            raise UserError("Invalid market id")
+        if gl.message.sender_address != self.market_creator[mid] and gl.message.sender_address != self.owner:
+            raise UserError("Only market creator or owner can pause")
+        if self.market_status[mid] != "OPEN":
+            raise UserError("Only open markets can be paused")
+        self.market_status[mid] = "PAUSED"
+        self.market_resolution_note[mid] = "Market paused by creator or protocol owner."
+
+    @gl.public.write
+    def resume_market(self, market_id: int) -> None:
+        mid = u256(market_id)
+        if mid == u256(0) or mid > self.market_count:
+            raise UserError("Invalid market id")
+        if gl.message.sender_address != self.market_creator[mid] and gl.message.sender_address != self.owner:
+            raise UserError("Only market creator or owner can resume")
+        if self.market_status[mid] != "PAUSED":
+            raise UserError("Only paused markets can be resumed")
+        self.market_status[mid] = "OPEN"
+        self.market_resolution_note[mid] = "Market resumed. Trading is open."
+
+    @gl.public.write
+    def cancel_market(self, market_id: int, note: str) -> None:
+        mid = u256(market_id)
+        if mid == u256(0) or mid > self.market_count:
+            raise UserError("Invalid market id")
+        if gl.message.sender_address != self.market_creator[mid] and gl.message.sender_address != self.owner:
+            raise UserError("Only market creator or owner can cancel")
+        if self.market_status[mid] == "RESOLVED":
+            raise UserError("Resolved markets cannot be canceled")
+        self.market_status[mid] = "CANCELED"
+        self.market_resolution_note[mid] = self._clip(note, 900)
+
+    @gl.public.write
     def resolve_market(self, market_id: int) -> u256:
         mid = u256(market_id)
         if mid == u256(0) or mid > self.market_count:
@@ -287,6 +380,7 @@ class Contract(gl.Contract):
             raise UserError("Only market creator or owner can resolve")
         if self.market_status[mid] != "OPEN":
             raise UserError("Market is not open")
+        self.market_status[mid] = "RESOLVING"
 
         title = self.market_title[mid]
         rules = self.market_rules[mid]
@@ -402,6 +496,8 @@ Return:
             "volume_cents": str(self.market_volume_cents[mid]),
             "liquidity_cents": str(self.market_liquidity_cents[mid]),
             "protocol_fee_cents": str(self.market_fee_cents[mid]),
+            "evidence_count": str(self.market_evidence_count[mid]),
+            "dispute_count": str(self.market_dispute_count[mid]),
         }
 
     @gl.public.view
@@ -457,3 +553,37 @@ Return:
     @gl.public.view
     def get_liquidity_position(self, market_id: int, user: Address) -> u256:
         return self.user_liquidity_cents[self._liquidity_key(u256(market_id), user)]
+
+    @gl.public.view
+    def get_evidence(self, market_id: int, evidence_index: int) -> dict:
+        mid = u256(market_id)
+        index = u256(evidence_index)
+        if mid == u256(0) or mid > self.market_count:
+            raise UserError("Invalid market id")
+        if index == u256(0) or index > self.market_evidence_count[mid]:
+            raise UserError("Invalid evidence id")
+        key = self._evidence_key(mid, index)
+        return {
+            "market_id": str(mid),
+            "evidence_index": str(index),
+            "url": self.evidence_url[key],
+            "note": self.evidence_note[key],
+            "submitter": str(self.evidence_submitter[key]),
+        }
+
+    @gl.public.view
+    def get_dispute(self, market_id: int, dispute_index: int) -> dict:
+        mid = u256(market_id)
+        index = u256(dispute_index)
+        if mid == u256(0) or mid > self.market_count:
+            raise UserError("Invalid market id")
+        if index == u256(0) or index > self.market_dispute_count[mid]:
+            raise UserError("Invalid dispute id")
+        key = self._dispute_key(mid, index)
+        return {
+            "market_id": str(mid),
+            "dispute_index": str(index),
+            "note": self.dispute_note[key],
+            "submitter": str(self.dispute_submitter[key]),
+            "status": self.dispute_status[key],
+        }

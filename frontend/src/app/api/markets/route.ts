@@ -208,7 +208,7 @@ async function fetchCoinGeckoMarkets(): Promise<Market[]> {
 }
 
 function genlayerMarket(): Market {
-  const contract = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad";
+  const contract = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "0x99EeB36b0BbC46bc00227d16d0b884DD9940994f";
   return {
     id: 100,
     title: "Will this Predicto Arena GenLayer contract resolve a market?",
@@ -222,7 +222,7 @@ function genlayerMarket(): Market {
       { name: "Not resolved", price: 48, change: "-2.0%", side: "down" }
     ],
     spark: [40, 42, 43, 45, 44, 48, 50, 49, 52, 51, 53, 52],
-    note: `GenLayer studionet contract ${contract}. The contract supports market factory, AMM buy/sell, liquidity, quotes, oracle resolution, and payout claims.`,
+    note: `GenLayer studionet contract ${contract}. The contract supports market factory, AMM buy/sell, liquidity, quotes, evidence logs, disputes, oracle resolution, and payout claims.`,
     source: "GenLayer studionet",
     sourceUrl: `https://studio.genlayer.com/`
   };

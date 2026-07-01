@@ -30,5 +30,5 @@ Predicto Arena is an end-to-end GenLayer prediction market terminal. GenLayer is
 
 - GitHub: https://github.com/Jinchainne/predicto-arena
 - Live app: https://predicto-arena.vercel.app
-- Contract address: `0x700fd6C7B42DE013EEaDeB594346fAA617A0Ecec`
+- Contract address: `0x99EeB36b0BbC46bc00227d16d0b884DD9940994f`
 - Network: studionet

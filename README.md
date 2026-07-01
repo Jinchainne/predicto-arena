@@ -10,7 +10,7 @@ This project is designed for **GenLayer Builders -> Projects**: a complete appli
 | --- | --- |
 | Production app | https://predicto-arena.vercel.app |
 | GitHub repository | https://github.com/Jinchainne/predicto-arena |
-| GenLayer StudioNet contract | `0x700fd6C7B42DE013EEaDeB594346fAA617A0Ecec` |
+| GenLayer StudioNet contract | `0x99EeB36b0BbC46bc00227d16d0b884DD9940994f` |
 | Network | `studionet` |
 
 ## Why This Is a GenLayer Builder Project
@@ -21,6 +21,8 @@ Predicto Arena uses GenLayer where it matters most:
 
 - **Intelligent Contract market factory**: live API markets can be mirrored on-chain by external market id.
 - **On-chain trading state**: buy, sell, liquidity, volume, fee, position, and quote data are tracked by the contract.
+- **Protocol lifecycle controls**: markets support open, paused, resolving, resolved, and canceled states.
+- **Evidence and dispute rails**: users can append public evidence and open post-resolution disputes.
 - **Evidence-based resolution**: `resolve_market` uses GenLayer web access and AI validator consensus to inspect public source URLs and select the winning outcome.
 - **Claim accounting**: resolved winning positions can be claimed through contract state.
 - **Wallet path**: the frontend connects to GenLayer StudioNet through `genlayer-js` and the GenLayer MetaMask Snap flow.
@@ -59,6 +61,9 @@ The deployed Intelligent Contract includes:
 | `add_liquidity` / `ensure_market_and_add_liquidity` | Adds balanced liquidity across market outcomes. |
 | `get_quote` / `get_quote_by_external_id` | Exposes contract-side price, fee, net, and impact data. |
 | `resolve_market` | Uses GenLayer web rendering and AI consensus to resolve a market from public evidence. |
+| `add_evidence` | Appends a public source URL and note to a market evidence log. |
+| `open_dispute` | Opens a post-resolution dispute with a reason note. |
+| `pause_market` / `resume_market` / `cancel_market` | Adds lifecycle controls for safer market operations. |
 | `claim_winnings` | Accounts for payout claims after resolution. |
 
 ## Architecture
@@ -112,7 +117,7 @@ GenLayer StudioNet Intelligent Contract
 Create `frontend/.env.local` or configure Vercel Environment Variables:
 
 ```env
-NEXT_PUBLIC_CONTRACT_ADDRESS=0x700fd6C7B42DE013EEaDeB594346fAA617A0Ecec
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x99EeB36b0BbC46bc00227d16d0b884DD9940994f
 NEXT_PUBLIC_GENLAYER_CHAIN=studionet
 NEXT_PUBLIC_GENLAYER_RPC_URL=
 
@@ -193,7 +198,7 @@ Suggested evidence:
 
 - GitHub: https://github.com/Jinchainne/predicto-arena
 - Live app: https://predicto-arena.vercel.app
-- Contract: `0x700fd6C7B42DE013EEaDeB594346fAA617A0Ecec`
+- Contract: `0x99EeB36b0BbC46bc00227d16d0b884DD9940994f`
 - Network: `studionet`
 
 ## Repository Structure

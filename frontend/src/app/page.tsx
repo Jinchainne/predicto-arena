@@ -94,7 +94,7 @@ type EthereumProvider = {
   removeListener?: (event: string, handler: (...args: any[]) => void) => void;
 };
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad";
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x99EeB36b0BbC46bc00227d16d0b884DD9940994f";
 const STUDIO_CHAIN_ID = "0xf22f";
 const STUDIO_RPC_URL = "https://studio.genlayer.com/api";
 const GENLAYER_SNAP_ID = "npm:genlayer-wallet-plugin";
@@ -283,7 +283,7 @@ export default function Home() {
   const [marketData, setMarketData] = useState<Market[]>(seedMarkets);
   const [dataStatus, setDataStatus] = useState<"loading" | "live" | "fallback">("loading");
   const [dataSources, setDataSources] = useState<string[]>([]);
-  const [contractAddress, setContractAddress] = useState("0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad");
+  const [contractAddress, setContractAddress] = useState("0x99EeB36b0BbC46bc00227d16d0b884DD9940994f");
   const [network, setNetwork] = useState("studionet");
   const [activeMarketId, setActiveMarketId] = useState(seedMarkets[0].id);
   const [tradeOutcome, setTradeOutcome] = useState(seedMarkets[0].outcomes[0].name);
@@ -341,7 +341,7 @@ export default function Home() {
         if (!cancelled && nextMarkets.length > 0) {
           setMarketData(nextMarkets);
           setDataSources(Array.isArray(payload.dataSources) ? payload.dataSources : []);
-          setContractAddress(payload.contractAddress || "0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad");
+          setContractAddress(payload.contractAddress || "0x99EeB36b0BbC46bc00227d16d0b884DD9940994f");
           setNetwork(payload.network || "studionet");
           const matchingMarket = nextMarkets.find((market: Market) => activeCategory === "All" || market.category === activeCategory || market.tag === activeCategory) ?? nextMarkets[0];
           setActiveMarketId(matchingMarket.id);
@@ -1366,7 +1366,7 @@ function GenLayerPanel({
       <h2><ShieldCheck size={18} />GenLayer network</h2>
       <div><span>Network</span><strong>{network}</strong></div>
       <div><span>Contract</span><strong>{shortAddress(contractAddress)}</strong></div>
-      <div><span>Methods</span><strong>create / buy / resolve</strong></div>
+      <div><span>Methods</span><strong>factory / trade / evidence / dispute</strong></div>
       <p>Market resolution is designed around GenLayer web evidence and AI consensus. Live prices are pulled from public exchange APIs, then resolved by contract rules.</p>
       <div className="source-list">
         {dataSources.map((source) => <span key={source}>{source}</span>)}
