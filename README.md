@@ -19,7 +19,7 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 - Trade ticket with buy/sell side, amount, estimated shares, and payout.
 - Nested drawer tabs for Trade, Book, Rules, and Oracle.
 - Portfolio, Leaderboard, and Earn Tickets sections.
-- Market data API at `/api/markets` with frontend hydration and seed fallback.
+- Live market data API at `/api/markets` using Binance/Binance.US public REST, CoinGecko public REST, and GenLayer studionet metadata.
 - Market creation API through `POST /api/markets`.
 - Trade ticket API through `POST /api/trades`.
 - EVM wallet connection through `window.ethereum` for MetaMask-compatible wallets.
@@ -30,6 +30,8 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 Prediction markets need transparent resolution. Predicto Arena is built around a GenLayer-style oracle flow where public sources, market rules, and AI-assisted evidence review can be used to resolve outcomes with stronger transparency than a centralized moderator.
 
 The deployed GenLayer contract supports market creation, position buying, public-source resolution, and view methods for markets, outcomes, and positions.
+
+TradingView is supported as a charting/widget direction rather than a public REST price API; live price data in this implementation comes from Binance/Binance.US and CoinGecko public APIs.
 
 ## Run Locally
 

@@ -13,6 +13,8 @@ type Market = {
   outcomes: Array<{ name: string; price: number; change: string; side: "up" | "down" }>;
   spark: number[];
   note: string;
+  source?: string;
+  sourceUrl?: string;
 };
 
 type CreateMarketState = {
@@ -22,6 +24,26 @@ type CreateMarketState = {
   closes: string;
   outcomes: string;
   rules: string;
+};
+
+type Position = {
+  id: string;
+  marketTitle: string;
+  outcome: string;
+  side: "buy" | "sell";
+  amount: number;
+  price: number;
+  shares: number;
+  createdAt: string;
+};
+
+type Mission = {
+  id: string;
+  title: string;
+  reward: number;
+  progress: number;
+  target: number;
+  claimed: boolean;
 };
 
 type EthereumProvider = {
@@ -141,10 +163,10 @@ const seedMarkets: Market[] = [
 ];
 
 const leaderboard = [
-  ["0x75...A7Dd", "$18,420", "+22.4%"],
-  ["0x11...9Caf", "$14,880", "+18.7%"],
-  ["0x92...Bee1", "$11,506", "+15.1%"],
-  ["0x33...F010", "$9,774", "+11.8%"]
+  { address: "0x75...A7Dd", volume: 18420, pnl: 22.4, tickets: 920 },
+  { address: "0x11...9Caf", volume: 14880, pnl: 18.7, tickets: 760 },
+  { address: "0x92...Bee1", volume: 11506, pnl: 15.1, tickets: 640 },
+  { address: "0x33...F010", volume: 9774, pnl: 11.8, tickets: 510 }
 ];
 
 function sparkPath(values: number[]) {
@@ -166,6 +188,9 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [marketData, setMarketData] = useState<Market[]>(seedMarkets);
   const [dataStatus, setDataStatus] = useState<"loading" | "live" | "fallback">("loading");
+  const [dataSources, setDataSources] = useState<string[]>([]);
+  const [contractAddress, setContractAddress] = useState("0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad");
+  const [network, setNetwork] = useState("studionet");
   const [activeMarketId, setActiveMarketId] = useState(seedMarkets[0].id);
   const [tradeOutcome, setTradeOutcome] = useState(seedMarkets[0].outcomes[0].name);
   const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
@@ -187,6 +212,14 @@ export default function Home() {
   const [aiQuestion, setAiQuestion] = useState("Explain the resolution risk for this market.");
   const [aiAnswer, setAiAnswer] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [tickets, setTickets] = useState(0);
+  const [missions, setMissions] = useState<Mission[]>([
+    { id: "trade-3", title: "Trade three active markets", reward: 40, progress: 0, target: 3, claimed: false },
+    { id: "liquidity-100", title: "Submit $100 trading volume", reward: 55, progress: 0, target: 100, claimed: false },
+    { id: "oracle-review", title: "Review an oracle source", reward: 25, progress: 0, target: 1, claimed: false },
+    { id: "create-market", title: "Create one market", reward: 35, progress: 0, target: 1, claimed: false }
+  ]);
   const [feed, setFeed] = useState<string[]>(["Market terminal online", "Oracle route: GenLayer web consensus", "Wallet simulation ready"]);
 
   useEffect(() => {
@@ -200,6 +233,9 @@ export default function Home() {
         const nextMarkets = Array.isArray(payload.markets) ? payload.markets : [];
         if (!cancelled && nextMarkets.length > 0) {
           setMarketData(nextMarkets);
+          setDataSources(Array.isArray(payload.dataSources) ? payload.dataSources : []);
+          setContractAddress(payload.contractAddress || "0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad");
+          setNetwork(payload.network || "studionet");
           setActiveMarketId(nextMarkets[0].id);
           setTradeOutcome(nextMarkets[0].outcomes[0]?.name ?? "");
           setDataStatus("live");
@@ -218,6 +254,24 @@ export default function Home() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("predicto-session");
+    if (!saved) return;
+    try {
+      const session = JSON.parse(saved);
+      if (Array.isArray(session.positions)) setPositions(session.positions);
+      if (Array.isArray(session.missions)) setMissions(session.missions);
+      if (Array.isArray(session.feed)) setFeed(session.feed);
+      if (typeof session.tickets === "number") setTickets(session.tickets);
+    } catch {
+      window.localStorage.removeItem("predicto-session");
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("predicto-session", JSON.stringify({ positions, missions, feed, tickets }));
+  }, [feed, missions, positions, tickets]);
 
   useEffect(() => {
     if (!window.ethereum?.on) return;
@@ -270,6 +324,22 @@ export default function Home() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Trade API failed");
+      const shares = Number(amount || 0) / Math.max(0.01, selectedOutcome.price / 100);
+      setPositions((items) => [
+        {
+          id: result.ticketId,
+          marketTitle: activeMarket.title,
+          outcome: tradeOutcome,
+          side: tradeSide,
+          amount: Number(amount || 0),
+          price: selectedOutcome.price,
+          shares,
+          createdAt: result.createdAt
+        },
+        ...items
+      ]);
+      updateMission("trade-3", 1);
+      updateMission("liquidity-100", Number(amount || 0));
       setTradeStatus(`Accepted ${result.ticketId}`);
       setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} for $${amount || "0"} via API`, ...items].slice(0, 6));
     } catch (error) {
@@ -295,6 +365,7 @@ export default function Home() {
       setTradeOutcome(nextMarket.outcomes[0]?.name ?? "");
       setActiveNav("Markets");
       setDrawerTab("Rules");
+      updateMission("create-market", 1);
       setFeed((items) => [`Created market via API: ${nextMarket.title}`, ...items].slice(0, 6));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Market creation failed";
@@ -316,6 +387,7 @@ export default function Home() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "AI request failed");
       setAiAnswer(result.answer);
+      updateMission("oracle-review", 1);
       setFeed((items) => [`AI analyzed ${activeMarket.title}`, ...items].slice(0, 6));
     } catch (error) {
       const message = error instanceof Error ? error.message : "AI request failed";
@@ -324,6 +396,25 @@ export default function Home() {
     } finally {
       setAiLoading(false);
     }
+  }
+
+  function updateMission(id: string, delta: number) {
+    setMissions((items) =>
+      items.map((mission) =>
+        mission.id === id ? { ...mission, progress: Math.min(mission.target, mission.progress + delta) } : mission
+      )
+    );
+  }
+
+  function claimMission(id: string) {
+    setMissions((items) =>
+      items.map((mission) => {
+        if (mission.id !== id || mission.claimed || mission.progress < mission.target) return mission;
+        setTickets((current) => current + mission.reward);
+        setFeed((feedItems) => [`Claimed ${mission.reward} tickets: ${mission.title}`, ...feedItems].slice(0, 6));
+        return { ...mission, claimed: true };
+      })
+    );
   }
 
   async function connectWallet() {
@@ -361,8 +452,8 @@ export default function Home() {
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search markets..." />
         </label>
         <button className="deposit" onClick={connectWallet}>{walletAddress ? "Connected" : "+ Connect"}</button>
-        <div className="wallet-pill">$0.06 Bal</div>
-        <div className="wallet-pill">$0.00 U.PnL</div>
+        <div className="wallet-pill">{tickets} Tickets</div>
+        <div className="wallet-pill">${positions.reduce((sum, item) => sum + item.amount, 0).toFixed(2)} Vol</div>
         <button className={walletError ? "wallet-address wallet-alert" : "wallet-address"} onClick={connectWallet}>
           {walletAddress ? shortAddress(walletAddress) : walletError || (dataStatus === "loading" ? "Loading API" : dataStatus === "live" ? "API Live" : "Seed data")}
         </button>
@@ -433,7 +524,7 @@ export default function Home() {
                     <div className="token">{market.category.slice(0, 2).toUpperCase()}</div>
                     <div>
                       <h3>{market.title}</h3>
-                      <p>{market.tag} / closes {market.closes}</p>
+                      <p>{market.tag} / {market.source ?? "Predicto"} / closes {market.closes}</p>
                     </div>
                   </div>
                   <div className="mini-outcomes">
@@ -499,6 +590,7 @@ export default function Home() {
               onQuestion={setAiQuestion}
               onAsk={askAi}
             />
+            <GenLayerPanel contractAddress={contractAddress} network={network} dataSources={dataSources} />
           </aside>
         </section>
       )}
@@ -511,9 +603,9 @@ export default function Home() {
           onSubmit={submitMarket}
         />
       )}
-      {activeNav === "Portfolio" && <Portfolio feed={feed} />}
-      {activeNav === "Leaderboard" && <Leaderboard />}
-      {activeNav === "Earn Tickets" && <Tickets />}
+      {activeNav === "Portfolio" && <Portfolio feed={feed} positions={positions} />}
+      {activeNav === "Leaderboard" && <Leaderboard walletAddress={walletAddress} positions={positions} tickets={tickets} />}
+      {activeNav === "Earn Tickets" && <Tickets missions={missions} onClaim={claimMission} />}
 
       <footer className="status-bar">
         <span className="online-dot" /> Local 11:32:48
@@ -544,6 +636,29 @@ function AiPanel({
       <textarea value={question} onChange={(event) => onQuestion(event.target.value)} />
       <button onClick={onAsk} disabled={loading}>{loading ? "Analyzing..." : "Ask AI"}</button>
       {answer && <p>{answer}</p>}
+    </div>
+  );
+}
+
+function GenLayerPanel({
+  contractAddress,
+  network,
+  dataSources
+}: {
+  contractAddress: string;
+  network: string;
+  dataSources: string[];
+}) {
+  return (
+    <div className="genlayer-panel">
+      <h2>GenLayer network</h2>
+      <div><span>Network</span><strong>{network}</strong></div>
+      <div><span>Contract</span><strong>{shortAddress(contractAddress)}</strong></div>
+      <div><span>Methods</span><strong>create / buy / resolve</strong></div>
+      <p>Market resolution is designed around GenLayer web evidence and AI consensus. Live prices are pulled from public exchange APIs, then resolved by contract rules.</p>
+      <div className="source-list">
+        {dataSources.map((source) => <span key={source}>{source}</span>)}
+      </div>
     </div>
   );
 }
@@ -607,6 +722,7 @@ function Rules({ market }: { market: Market }) {
     <div className="rules">
       <h2>Resolution rules</h2>
       <p>{market.note}</p>
+      {market.sourceUrl && <a href={market.sourceUrl} target="_blank" rel="noreferrer">Open source data</a>}
       <p>Markets resolve through public sources, oracle review, and GenLayer-style consensus checks. Ambiguous outcomes remain open until the evidence threshold is met.</p>
     </div>
   );
@@ -617,27 +733,32 @@ function Oracle({ market }: { market: Market }) {
     <div className="oracle">
       <h2>Oracle route</h2>
       <div><span>Primary source</span><strong>{market.category} public data</strong></div>
+      <div><span>Live API</span><strong>{market.source ?? "Predicto"}</strong></div>
       <div><span>Review mode</span><strong>AI evidence consensus</strong></div>
       <div><span>Status</span><strong>Ready</strong></div>
     </div>
   );
 }
 
-function Portfolio({ feed }: { feed: string[] }) {
+function Portfolio({ feed, positions }: { feed: string[]; positions: Position[] }) {
+  const totalValue = positions.reduce((sum, item) => sum + item.amount, 0);
+  const exposure = positions.reduce((sum, item) => sum + item.shares, 0);
+
   return (
     <section className="portfolio-view">
       <div className="portfolio-card">
         <span>Total value</span>
-        <strong>$2,418.20</strong>
-        <em>+14.2% this week</em>
+        <strong>${totalValue.toFixed(2)}</strong>
+        <em>{exposure.toFixed(2)} active shares</em>
       </div>
       <div className="portfolio-table">
         <h2>Open positions</h2>
-        {["France World Cup", "BTC above $120K", "OpenAI benchmark lead"].map((name, index) => (
-          <div key={name}>
-            <span>{name}</span>
-            <strong>{[31, 46, 38][index]}c</strong>
-            <em>{["$804.20", "$422.10", "$318.00"][index]}</em>
+        {positions.length === 0 && <p>No positions yet. Place a trade from the Markets tab.</p>}
+        {positions.map((position) => (
+          <div key={position.id}>
+            <span>{position.marketTitle}</span>
+            <strong>{position.outcome} @ {position.price}c</strong>
+            <em>${position.amount.toFixed(2)}</em>
           </div>
         ))}
       </div>
@@ -649,36 +770,69 @@ function Portfolio({ feed }: { feed: string[] }) {
   );
 }
 
-function Leaderboard() {
+function Leaderboard({
+  walletAddress,
+  positions,
+  tickets
+}: {
+  walletAddress: string;
+  positions: Position[];
+  tickets: number;
+}) {
+  const [sortBy, setSortBy] = useState<"volume" | "pnl" | "tickets">("volume");
+  const userVolume = positions.reduce((sum, item) => sum + item.amount, 0);
+  const rows = [
+    ...leaderboard,
+    {
+      address: walletAddress ? shortAddress(walletAddress) : "You",
+      volume: userVolume,
+      pnl: positions.length ? 3.2 : 0,
+      tickets
+    }
+  ].sort((a, b) => b[sortBy] - a[sortBy]);
+
   return (
     <section className="leaderboard-view">
       <h1>Leaderboard</h1>
-      {leaderboard.map((row, index) => (
-        <div className="rank-row" key={row[0]}>
+      <div className="view-tabs">
+        <button className={sortBy === "volume" ? "active" : ""} onClick={() => setSortBy("volume")}>Volume</button>
+        <button className={sortBy === "pnl" ? "active" : ""} onClick={() => setSortBy("pnl")}>PnL</button>
+        <button className={sortBy === "tickets" ? "active" : ""} onClick={() => setSortBy("tickets")}>Tickets</button>
+      </div>
+      {rows.map((row, index) => (
+        <div className="rank-row" key={`${row.address}-${index}`}>
           <span>#{index + 1}</span>
-          <strong>{row[0]}</strong>
-          <em>{row[1]}</em>
-          <b>{row[2]}</b>
+          <strong>{row.address}</strong>
+          <em>${row.volume.toLocaleString()}</em>
+          <b>{row.pnl >= 0 ? "+" : ""}{row.pnl.toFixed(1)}%</b>
+          <i>{row.tickets} tickets</i>
         </div>
       ))}
     </section>
   );
 }
 
-function Tickets() {
+function Tickets({ missions, onClaim }: { missions: Mission[]; onClaim: (id: string) => void }) {
   return (
     <section className="tickets-view">
       <div>
         <h1>Earn Tickets</h1>
         <p>Complete market missions, provide liquidity, and review oracle disputes to earn weekly prediction tickets.</p>
       </div>
-      {["Trade three active markets", "Provide $100 liquidity", "Review an oracle source", "Invite one forecaster"].map((mission, index) => (
-        <article key={mission}>
+      {missions.map((mission, index) => {
+        const complete = mission.progress >= mission.target;
+        return (
+        <article key={mission.id} className={mission.claimed ? "claimed" : ""}>
           <span>Mission {index + 1}</span>
-          <h2>{mission}</h2>
-          <button>Claim reward</button>
+          <h2>{mission.title}</h2>
+          <div className="progress-track"><span style={{ width: `${Math.min(100, (mission.progress / mission.target) * 100)}%` }} /></div>
+          <p>{Math.min(mission.progress, mission.target).toFixed(mission.target > 10 ? 0 : 0)} / {mission.target} progress</p>
+          <button disabled={!complete || mission.claimed} onClick={() => onClaim(mission.id)}>
+            {mission.claimed ? "Claimed" : complete ? `Claim ${mission.reward} tickets` : "In progress"}
+          </button>
         </article>
-      ))}
+        );
+      })}
     </section>
   );
 }
