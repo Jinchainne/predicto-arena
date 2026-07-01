@@ -162,6 +162,34 @@ const worldCupImages = [
     title: "Final path simulator",
     image: "https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?auto=format&fit=crop&w=1200&q=85",
     detail: "Bracket paths, travel distance, rest days, and climate all affect favorites."
+  },
+  {
+    title: "Supporter energy index",
+    image: "https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1200&q=85",
+    detail: "Home crowds, fan travel, and stadium energy shape momentum markets."
+  },
+  {
+    title: "Training ground watch",
+    image: "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?auto=format&fit=crop&w=1200&q=85",
+    detail: "Injury reports, training intensity, and tactical setups feed oracle evidence."
+  },
+  {
+    title: "Stadium climate board",
+    image: "https://images.unsplash.com/photo-1504016798967-59a258e9386d?auto=format&fit=crop&w=1200&q=85",
+    detail: "Heat, rain, wind, and turf conditions can change match tempo."
+  }
+];
+
+const worldCupClips = [
+  {
+    title: "FIFA World Cup 2026 Trailer",
+    platform: "YouTube",
+    id: "91htvvcIurs"
+  },
+  {
+    title: "This is FIFA World Cup 26",
+    platform: "YouTube",
+    id: "ZTdOX1U2K0Q"
   }
 ];
 
@@ -1202,6 +1230,29 @@ function FootballEventBoard({
             <p>{event.detail}</p>
           </article>
         ))}
+      </div>
+
+      <div className="football-media">
+        <div>
+          <span>Video pulse</span>
+          <strong>World Cup 2026 clips</strong>
+        </div>
+        <div className="clip-grid">
+          {worldCupClips.map((clip) => (
+            <article key={clip.id}>
+              <iframe
+                title={clip.title}
+                src={`https://www.youtube.com/embed/${clip.id}?rel=0&modestbranding=1`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+              <div>
+                <span>{clip.platform}</span>
+                <strong>{clip.title}</strong>
+              </div>
+            </article>
+          ))}
+        </div>
       </div>
 
       <div className="qualified-teams">
