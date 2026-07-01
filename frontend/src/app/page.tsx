@@ -343,8 +343,9 @@ export default function Home() {
           setDataSources(Array.isArray(payload.dataSources) ? payload.dataSources : []);
           setContractAddress(payload.contractAddress || "0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad");
           setNetwork(payload.network || "studionet");
-          setActiveMarketId(nextMarkets[0].id);
-          setTradeOutcome(nextMarkets[0].outcomes[0]?.name ?? "");
+          const matchingMarket = nextMarkets.find((market: Market) => activeCategory === "All" || market.category === activeCategory || market.tag === activeCategory) ?? nextMarkets[0];
+          setActiveMarketId(matchingMarket.id);
+          setTradeOutcome(matchingMarket.outcomes[0]?.name ?? "");
           setDataStatus("live");
           setFeed((items) => ["Loaded live market API data", ...items].slice(0, 6));
         }
@@ -360,7 +361,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeCategory]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("predicto-session");
@@ -444,6 +445,17 @@ export default function Home() {
     setTradeOutcome(market.outcomes[0].name);
     setDrawerTab("Trade");
     setFeed((items) => [`Opened ${market.title}`, ...items].slice(0, 6));
+  }
+
+  function selectCategory(category: string) {
+    setActiveCategory(category);
+    const nextMarket = marketData.find((market) => category === "All" || market.category === category || market.tag === category);
+    if (nextMarket) {
+      setActiveMarketId(nextMarket.id);
+      setTradeOutcome(nextMarket.outcomes[0]?.name ?? "");
+      setDrawerTab("Trade");
+      setFeed((items) => [`Opened ${category} market board`, ...items].slice(0, 6));
+    }
   }
 
   function openMarketView(view: "Markets" | "Outcomes" | "Volume") {
@@ -867,7 +879,7 @@ export default function Home() {
         {categories.map((category) => {
           const Icon = categoryIcons[category as keyof typeof categoryIcons];
           return (
-            <button key={category} className={activeCategory === category ? "selected" : ""} onClick={() => setActiveCategory(category)}>
+            <button key={category} className={activeCategory === category ? "selected" : ""} onClick={() => selectCategory(category)}>
               <Icon size={15} />{category}
             </button>
           );
