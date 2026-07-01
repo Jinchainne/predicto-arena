@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -57,6 +57,14 @@ type WeatherSnapshot = {
   };
   units?: Record<string, string>;
   source: string;
+};
+
+type WorldCupFeedItem = {
+  type: "score" | "fixture" | "news";
+  headline: string;
+  status?: string;
+  source: string;
+  url?: string;
 };
 
 type CreateMarketState = {
@@ -245,54 +253,138 @@ const worldCupTeams = [
 ];
 
 const countryFlags: Record<string, string> = {
-  CAN: "🇨🇦",
-  MEX: "🇲🇽",
-  USA: "🇺🇸",
-  JPN: "🇯🇵",
-  IRN: "🇮🇷",
-  UZB: "🇺🇿",
-  KOR: "🇰🇷",
-  JOR: "🇯🇴",
-  AUS: "🇦🇺",
-  QAT: "🇶🇦",
-  KSA: "🇸🇦",
-  IRQ: "🇮🇶",
-  MAR: "🇲🇦",
-  TUN: "🇹🇳",
-  EGY: "🇪🇬",
-  ALG: "🇩🇿",
-  GHA: "🇬🇭",
-  CIV: "🇨🇮",
-  SEN: "🇸🇳",
-  RSA: "🇿🇦",
-  CPV: "🇨🇻",
-  COD: "🇨🇩",
-  ARG: "🇦🇷",
-  BRA: "🇧🇷",
-  ECU: "🇪🇨",
-  COL: "🇨🇴",
-  URU: "🇺🇾",
-  PAR: "🇵🇾",
-  NZL: "🇳🇿",
-  PAN: "🇵🇦",
-  HAI: "🇭🇹",
-  CUW: "🇨🇼",
-  ENG: "🏴",
-  FRA: "🇫🇷",
-  CRO: "🇭🇷",
-  NOR: "🇳🇴",
-  POR: "🇵🇹",
-  GER: "🇩🇪",
-  NED: "🇳🇱",
-  SUI: "🇨🇭",
-  SCO: "🏴",
-  ESP: "🇪🇸",
-  BEL: "🇧🇪",
-  AUT: "🇦🇹",
-  TUR: "🇹🇷",
-  CZE: "🇨🇿",
-  SWE: "🇸🇪",
-  BIH: "🇧🇦"
+  CAN: "ðŸ‡¨ðŸ‡¦",
+  MEX: "ðŸ‡²ðŸ‡½",
+  USA: "ðŸ‡ºðŸ‡¸",
+  JPN: "ðŸ‡¯ðŸ‡µ",
+  IRN: "ðŸ‡®ðŸ‡·",
+  UZB: "ðŸ‡ºðŸ‡¿",
+  KOR: "ðŸ‡°ðŸ‡·",
+  JOR: "ðŸ‡¯ðŸ‡´",
+  AUS: "ðŸ‡¦ðŸ‡º",
+  QAT: "ðŸ‡¶ðŸ‡¦",
+  KSA: "ðŸ‡¸ðŸ‡¦",
+  IRQ: "ðŸ‡®ðŸ‡¶",
+  MAR: "ðŸ‡²ðŸ‡¦",
+  TUN: "ðŸ‡¹ðŸ‡³",
+  EGY: "ðŸ‡ªðŸ‡¬",
+  ALG: "ðŸ‡©ðŸ‡¿",
+  GHA: "ðŸ‡¬ðŸ‡­",
+  CIV: "ðŸ‡¨ðŸ‡®",
+  SEN: "ðŸ‡¸ðŸ‡³",
+  RSA: "ðŸ‡¿ðŸ‡¦",
+  CPV: "ðŸ‡¨ðŸ‡»",
+  COD: "ðŸ‡¨ðŸ‡©",
+  ARG: "ðŸ‡¦ðŸ‡·",
+  BRA: "ðŸ‡§ðŸ‡·",
+  ECU: "ðŸ‡ªðŸ‡¨",
+  COL: "ðŸ‡¨ðŸ‡´",
+  URU: "ðŸ‡ºðŸ‡¾",
+  PAR: "ðŸ‡µðŸ‡¾",
+  NZL: "ðŸ‡³ðŸ‡¿",
+  PAN: "ðŸ‡µðŸ‡¦",
+  HAI: "ðŸ‡­ðŸ‡¹",
+  CUW: "ðŸ‡¨ðŸ‡¼",
+  ENG: "ðŸ´",
+  FRA: "ðŸ‡«ðŸ‡·",
+  CRO: "ðŸ‡­ðŸ‡·",
+  NOR: "ðŸ‡³ðŸ‡´",
+  POR: "ðŸ‡µðŸ‡¹",
+  GER: "ðŸ‡©ðŸ‡ª",
+  NED: "ðŸ‡³ðŸ‡±",
+  SUI: "ðŸ‡¨ðŸ‡­",
+  SCO: "ðŸ´",
+  ESP: "ðŸ‡ªðŸ‡¸",
+  BEL: "ðŸ‡§ðŸ‡ª",
+  AUT: "ðŸ‡¦ðŸ‡¹",
+  TUR: "ðŸ‡¹ðŸ‡·",
+  CZE: "ðŸ‡¨ðŸ‡¿",
+  SWE: "ðŸ‡¸ðŸ‡ª",
+  BIH: "ðŸ‡§ðŸ‡¦"
+};
+
+const countryIso: Record<string, string> = {
+  CAN: "ca", MEX: "mx", USA: "us", JPN: "jp", IRN: "ir", UZB: "uz", KOR: "kr", JOR: "jo",
+  AUS: "au", QAT: "qa", KSA: "sa", IRQ: "iq", MAR: "ma", TUN: "tn", EGY: "eg", ALG: "dz",
+  GHA: "gh", CIV: "ci", SEN: "sn", RSA: "za", CPV: "cv", COD: "cd", ARG: "ar", BRA: "br",
+  ECU: "ec", COL: "co", URU: "uy", PAR: "py", NZL: "nz", PAN: "pa", HAI: "ht", CUW: "cw",
+  ENG: "gb-eng", FRA: "fr", CRO: "hr", NOR: "no", POR: "pt", GER: "de", NED: "nl", SUI: "ch",
+  SCO: "gb-sct", ESP: "es", BEL: "be", AUT: "at", TUR: "tr", CZE: "cz", SWE: "se", BIH: "ba"
+};
+
+const categoryThemes: Record<string, {
+  kicker: string;
+  hero: string;
+  description: string;
+  sources: string[];
+  cards: Array<{ label: string; title: string; detail: string; image: string }>;
+}> = {
+  AI: {
+    kicker: "AI benchmark desk",
+    hero: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1400&q=85",
+    description: "Model releases, benchmark boards, eval suites, and official lab posts become oracle evidence.",
+    sources: ["Benchmarks", "Model cards", "Lab releases", "Public leaderboards"],
+    cards: [
+      { label: "Eval", title: "Benchmark movement", detail: "Track coding, reasoning, and multimodal score changes.", image: "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=900&q=85" },
+      { label: "Release", title: "Model launch radar", detail: "Official announcements can change probabilities instantly.", image: "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=900&q=85" },
+      { label: "Oracle", title: "Source review queue", detail: "GenLayer can inspect public evidence during resolution.", image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=900&q=85" }
+    ]
+  },
+  Culture: {
+    kicker: "Culture market desk",
+    hero: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1400&q=85",
+    description: "Streaming charts, festival schedules, film rankings, and public cultural indexes replace financial charts.",
+    sources: ["Streaming charts", "Box office", "Festival data", "Public rankings"],
+    cards: [
+      { label: "Music", title: "Streaming chart pulse", detail: "Weekly public charts drive music and artist markets.", image: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=900&q=85" },
+      { label: "Cinema", title: "Box office race", detail: "Revenue and release calendars create event-driven movement.", image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=85" },
+      { label: "Events", title: "Festival signal board", detail: "Lineups, awards, and attendance can resolve culture markets.", image: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=900&q=85" }
+    ]
+  },
+  Economy: {
+    kicker: "Macro event terminal",
+    hero: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1400&q=85",
+    description: "Central bank decisions, inflation prints, employment reports, and public statistics power macro markets.",
+    sources: ["Central banks", "CPI releases", "Jobs data", "Treasury calendars"],
+    cards: [
+      { label: "Rates", title: "Policy countdown", detail: "Meeting calendars and official statements shape rate markets.", image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=900&q=85" },
+      { label: "Inflation", title: "CPI print watch", detail: "Public statistical releases become settlement evidence.", image: "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=900&q=85" },
+      { label: "Labor", title: "Jobs report board", detail: "Employment reports create high-volatility forecast windows.", image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=900&q=85" }
+    ]
+  },
+  Politics: {
+    kicker: "Public policy desk",
+    hero: "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1400&q=85",
+    description: "Official votes, agency pages, public statements, and court calendars support political prediction markets.",
+    sources: ["Official records", "Court calendars", "Agency releases", "Election boards"],
+    cards: [
+      { label: "Vote", title: "Legislative outcome", detail: "Bills, roll calls, and official records determine settlement.", image: "https://images.unsplash.com/photo-1541872705-1f73c6400ec9?auto=format&fit=crop&w=900&q=85" },
+      { label: "Policy", title: "Agency announcement", detail: "Public releases can create binary policy outcomes.", image: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=900&q=85" },
+      { label: "Election", title: "Result evidence", detail: "Election boards and certified results become oracle sources.", image: "https://images.unsplash.com/photo-1494172961521-33799ddd43a5?auto=format&fit=crop&w=900&q=85" }
+    ]
+  },
+  Sports: {
+    kicker: "Sports event desk",
+    hero: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1400&q=85",
+    description: "Scores, fixtures, injury reports, and official league result pages power sports markets.",
+    sources: ["Scoreboards", "League pages", "Team reports", "Fixture lists"],
+    cards: [
+      { label: "Live", title: "Scoreboard pulse", detail: "Official scores and game status move event prices.", image: "https://images.unsplash.com/photo-1547347298-4074fc3086f0?auto=format&fit=crop&w=900&q=85" },
+      { label: "Teams", title: "Injury and lineup watch", detail: "Team reports can explain pre-match probability swings.", image: "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=900&q=85" },
+      { label: "Oracle", title: "Official result source", detail: "Final settlement should cite league or federation result pages.", image: "https://images.unsplash.com/photo-1505843279827-4b5226b2c190?auto=format&fit=crop&w=900&q=85" }
+    ]
+  },
+  New: {
+    kicker: "New market launchpad",
+    hero: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1400&q=85",
+    description: "Fresh markets show source plans, close windows, liquidity goals, and GenLayer resolution routes.",
+    sources: ["Market rules", "Evidence links", "Oracle route", "Liquidity"],
+    cards: [
+      { label: "Launch", title: "Market intake", detail: "Every new market needs clear title, outcomes, and rules.", image: "https://images.unsplash.com/photo-1559136555-9303baea8ebd?auto=format&fit=crop&w=900&q=85" },
+      { label: "Rules", title: "Resolution preview", detail: "Rules are visible before users commit liquidity or trades.", image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=900&q=85" },
+      { label: "Risk", title: "Oracle readiness", detail: "Source quality determines whether markets are safe to settle.", image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=85" }
+    ]
+  }
 };
 
 const seedMarkets: Market[] = [
@@ -458,6 +550,8 @@ export default function Home() {
   const [walletSnapReady, setWalletSnapReady] = useState<boolean | null>(null);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
   const [weatherStatus, setWeatherStatus] = useState<"idle" | "loading" | "live" | "error">("idle");
+  const [worldCupFeed, setWorldCupFeed] = useState<WorldCupFeedItem[]>([]);
+  const [worldCupFeedStatus, setWorldCupFeedStatus] = useState<"loading" | "live" | "fallback">("loading");
   const [aiQuestion, setAiQuestion] = useState("Explain the resolution risk for this market.");
   const [aiAnswer, setAiAnswer] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -581,6 +675,39 @@ export default function Home() {
       cancelled = true;
     };
   }, [contextLocation]);
+
+  useEffect(() => {
+    if (!activeIsFootball) return;
+    let cancelled = false;
+
+    async function loadWorldCupFeed() {
+      setWorldCupFeedStatus("loading");
+      try {
+        const response = await fetch("/api/world-cup-feed", { cache: "no-store" });
+        if (!response.ok) throw new Error("World Cup feed unavailable");
+        const payload = await response.json();
+        if (!cancelled) {
+          setWorldCupFeed(Array.isArray(payload.items) ? payload.items : []);
+          setWorldCupFeedStatus(payload.source === "live" ? "live" : "fallback");
+        }
+      } catch {
+        if (!cancelled) {
+          setWorldCupFeed([
+            { type: "fixture", headline: "World Cup 2026 ticker is refreshing live sports sources.", status: "Refreshing", source: "Predicto Arena" },
+            { type: "news", headline: "GenLayer oracle review can settle markets from official FIFA public result evidence.", status: "Oracle", source: "GenLayer StudioNet" }
+          ]);
+          setWorldCupFeedStatus("fallback");
+        }
+      }
+    }
+
+    loadWorldCupFeed();
+    const timer = window.setInterval(loadWorldCupFeed, 120000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activeIsFootball]);
 
   function selectMarket(market: Market) {
     setActiveMarketId(market.id);
@@ -1097,7 +1224,7 @@ export default function Home() {
                       className={tradeOutcome === outcome.name ? "outcome selected" : "outcome"}
                       onClick={() => setTradeOutcome(outcome.name)}
                     >
-                      {activeIsFootball && <b>{flagForTeam(outcome.name)}</b>}
+                      {activeIsFootball && <b><img src={flagForOutcome(outcome.name)} alt="" /></b>}
                       <span>{outcome.name}</span>
                       <strong>{outcome.price}c</strong>
                       <em className={outcome.side}>{outcome.change}</em>
@@ -1105,8 +1232,8 @@ export default function Home() {
                   ))}
                 </div>
                 {activeIsFootball ? (
-                  <FootballEventBoard market={activeMarket} selectedOutcome={tradeOutcome} />
-                ) : (
+                  <FootballEventBoard market={activeMarket} selectedOutcome={tradeOutcome} feed={worldCupFeed} feedStatus={worldCupFeedStatus} />
+                ) : isCryptoMarket(activeMarket) ? (
                   <div className="chart-panel tradingview-panel">
                     <TradingViewChart market={activeMarket} />
                     <div className="chart-meta">
@@ -1116,6 +1243,8 @@ export default function Home() {
                       <span>{activeMarket.source ?? "Predicto"}</span>
                     </div>
                   </div>
+                ) : (
+                  <CategoryEventBoard market={activeMarket} selectedOutcome={tradeOutcome} />
                 )}
               </div>
             </div>
@@ -1254,10 +1383,14 @@ function TradingViewChart({ market }: { market: Market }) {
 
 function FootballEventBoard({
   market,
-  selectedOutcome
+  selectedOutcome,
+  feed,
+  feedStatus
 }: {
   market: Market;
   selectedOutcome: string;
+  feed: WorldCupFeedItem[];
+  feedStatus: "loading" | "live" | "fallback";
 }) {
   const headline = worldCupImages[market.id % worldCupImages.length];
   const eventCards = worldCupImages.map((event, index) => ({
@@ -1277,6 +1410,8 @@ function FootballEventBoard({
         <p>{headline.detail}</p>
       </div>
 
+      <WorldCupNewsTicker items={feed} status={feedStatus} />
+
       <div className="football-events">
         {eventCards.map((event) => (
           <article key={event.title} style={{ backgroundImage: `linear-gradient(180deg, rgba(10,4,13,.2), rgba(10,4,13,.92)), url(${event.image})` }}>
@@ -1289,23 +1424,19 @@ function FootballEventBoard({
 
       <div className="football-media">
         <div>
-          <span>Video pulse</span>
-          <strong>World Cup 2026 clips</strong>
+          <span>Media pulse</span>
+          <strong>World Cup 2026 video links</strong>
         </div>
         <div className="clip-grid">
           {worldCupClips.map((clip) => (
-            <article key={clip.id}>
-              <iframe
-                title={clip.title}
-                src={`https://www.youtube.com/embed/${clip.id}?rel=0&modestbranding=1`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
+            <a key={clip.id} href={`https://www.youtube.com/watch?v=${clip.id}`} target="_blank" rel="noreferrer">
+              <img src={`https://img.youtube.com/vi/${clip.id}/hqdefault.jpg`} alt="" />
               <div>
                 <span>{clip.platform}</span>
                 <strong>{clip.title}</strong>
+                <em>Open video</em>
               </div>
-            </article>
+            </a>
           ))}
         </div>
       </div>
@@ -1323,13 +1454,75 @@ function FootballEventBoard({
         <div className="team-strip">
           {worldCupTeams.map((team) => (
             <button key={team.name} type="button">
-              <span>{countryFlags[team.code] ?? "🏳️"} {team.code}</span>
+              <span><img src={flagUrl(team.code)} alt="" />{team.code}</span>
               <strong>{team.name}</strong>
               <em>{team.group}</em>
             </button>
           ))}
         </div>
         <p>{market.source ?? "FIFA public evidence"} tracks participating teams, fixtures, and official result sources for GenLayer resolution.</p>
+      </div>
+    </div>
+  );
+}
+
+function WorldCupNewsTicker({ items, status }: { items: WorldCupFeedItem[]; status: "loading" | "live" | "fallback" }) {
+  const feedItems: WorldCupFeedItem[] = items.length > 0 ? items : [
+    { type: "fixture", headline: "Loading World Cup news and score ticker...", status: "Live feed", source: "Predicto Arena" }
+  ];
+  const repeated = [...feedItems, ...feedItems];
+
+  return (
+    <div className="wc-news-ticker">
+      <div className="wc-news-head">
+        <span><Activity size={14} />{status === "live" ? "Live sports API" : status === "loading" ? "Loading" : "Fallback oracle feed"}</span>
+        <strong>World Cup electronic board</strong>
+      </div>
+      <div className="wc-news-rail">
+        <div className="wc-news-track">
+          {repeated.map((item, index) => {
+            const content = (
+              <>
+                <b>{item.type === "score" ? "Score" : item.type === "fixture" ? "Fixture" : "News"}</b>
+                <strong>{item.headline}</strong>
+                <em>{item.status ?? item.source}</em>
+              </>
+            );
+            return item.url ? (
+              <a key={`${item.headline}-${index}`} className={`wc-news-item ${item.type}`} href={item.url} target="_blank" rel="noreferrer">{content}</a>
+            ) : (
+              <span key={`${item.headline}-${index}`} className={`wc-news-item ${item.type}`}>{content}</span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryEventBoard({ market, selectedOutcome }: { market: Market; selectedOutcome: string }) {
+  const theme = categoryThemes[market.category] ?? categoryThemes.New;
+  return (
+    <div className="category-event-board">
+      <div className="category-event-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(13,5,17,.92), rgba(13,5,17,.38)), url(${theme.hero})` }}>
+        <span>{theme.kicker}</span>
+        <strong>{selectedOutcome} evidence desk</strong>
+        <p>{theme.description}</p>
+      </div>
+      <div className="category-signal-grid">
+        {theme.cards.map((card) => (
+          <article key={card.title} style={{ backgroundImage: `linear-gradient(180deg, rgba(10,4,13,.2), rgba(10,4,13,.92)), url(${card.image})` }}>
+            <span>{card.label}</span>
+            <strong>{card.title}</strong>
+            <p>{card.detail}</p>
+          </article>
+        ))}
+      </div>
+      <div className="oracle-source-strip">
+        {theme.sources.map((source) => (
+          <span key={source}>{source}</span>
+        ))}
+        <em>{market.source ?? "Public evidence"} / closes {market.closes}</em>
       </div>
     </div>
   );
@@ -1509,18 +1702,27 @@ function inferWeatherLocation(market: Market, outcome: string) {
 }
 
 function isFootballMarket(market: Market) {
-  return market.category === "World Cup" || market.category === "Sports" || market.tag === "Football";
+  return market.category === "World Cup" || market.tag === "Football";
 }
 
-function flagForTeam(name: string) {
+function isCryptoMarket(market: Market) {
+  return market.category === "Crypto" || ["Price", "Fundamentals", "Binance"].includes(market.tag);
+}
+
+function flagUrl(code: string) {
+  const iso = countryIso[code] ?? "un";
+  return `https://flagcdn.com/w40/${iso}.png`;
+}
+
+function flagForOutcome(name: string) {
   const normalized = name.toLowerCase();
   const team = worldCupTeams.find((item) => item.name.toLowerCase() === normalized);
-  if (team) return countryFlags[team.code] ?? "🏳️";
-  if (normalized.includes("france")) return "🇫🇷";
-  if (normalized.includes("argentina")) return "🇦🇷";
-  if (normalized.includes("brazil")) return "🇧🇷";
-  if (normalized.includes("england")) return "🏴";
-  return "⚽";
+  if (team) return flagUrl(team.code);
+  if (normalized.includes("france")) return flagUrl("FRA");
+  if (normalized.includes("argentina")) return flagUrl("ARG");
+  if (normalized.includes("brazil")) return flagUrl("BRA");
+  if (normalized.includes("england")) return flagUrl("ENG");
+  return "https://flagcdn.com/w40/un.png";
 }
 
 function formatWeatherValue(value: number | undefined, unit = "") {
