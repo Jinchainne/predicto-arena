@@ -222,7 +222,7 @@ function genlayerMarket(): Market {
       { name: "Not resolved", price: 48, change: "-2.0%", side: "down" }
     ],
     spark: [40, 42, 43, 45, 44, 48, 50, 49, 52, 51, 53, 52],
-    note: `GenLayer studionet contract ${contract}. The contract supports create_market, buy_position, resolve_market, and public view reads.`,
+    note: `GenLayer studionet contract ${contract}. The contract supports market factory, AMM buy/sell, liquidity, quotes, oracle resolution, and payout claims.`,
     source: "GenLayer studionet",
     sourceUrl: `https://studio.genlayer.com/`
   };

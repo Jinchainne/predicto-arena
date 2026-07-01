@@ -77,7 +77,7 @@ type EthereumProvider = {
   removeListener?: (event: string, handler: (...args: any[]) => void) => void;
 };
 
-const CONTRACT_ADDRESS = "0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad";
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad";
 const STUDIO_CHAIN_ID = "0xf22f";
 const STUDIO_RPC_URL = "https://studio.genlayer.com/api";
 
@@ -379,7 +379,7 @@ export default function Home() {
       const outcomeIndex = Math.max(1, activeMarket.outcomes.findIndex((outcome) => outcome.name === tradeOutcome) + 1);
       const amountNumber = Number(amount || 0);
       const amountCents = Math.max(1, Math.round(amountNumber * 100));
-      const txHash = await submitGenLayerTrade(account, activeMarket.id, outcomeIndex, amountCents, amountNumber);
+      const txHash = await submitGenLayerTrade(account, activeMarket, outcomeIndex, amountCents, amountNumber);
       setTxSteps(["Wallet confirmed", "GenLayer transaction sent", shortHash(txHash)]);
 
       const response = await fetch("/api/trades", {
@@ -490,14 +490,27 @@ export default function Home() {
     );
   }
 
-  function addLiquidity() {
+  async function addLiquidity() {
     const value = Number(liquidityAmount || 0);
     if (!Number.isFinite(value) || value <= 0) {
       setFeed((items) => ["Liquidity amount must be positive", ...items].slice(0, 6));
       return;
     }
-    updateMission("liquidity-100", value);
-    setFeed((items) => [`Added ${value.toFixed(2)} GEN simulated liquidity to ${activeMarket.title}`, ...items].slice(0, 6));
+    try {
+      if (!walletAddress) {
+        await connectWallet();
+      }
+      const account = walletAddress || (await requestPrimaryAccount());
+      await ensureStudioNet();
+      const amountCents = Math.max(1, Math.round(value * 100));
+      const txHash = await submitGenLayerLiquidity(account, activeMarket, amountCents, value);
+      updateMission("liquidity-100", value);
+      await refreshWalletState(account);
+      setFeed((items) => [`Added ${value.toFixed(2)} GEN liquidity on GenLayer ${shortHash(txHash)}`, ...items].slice(0, 6));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Liquidity transaction failed";
+      setFeed((items) => [`Liquidity error: ${message}`, ...items].slice(0, 6));
+    }
   }
 
   async function connectWallet() {
@@ -574,13 +587,45 @@ export default function Home() {
     setWalletChain(chainId === STUDIO_CHAIN_ID ? "GenLayer StudioNet" : String(chainId));
   }
 
-  async function submitGenLayerTrade(account: string, marketId: number, outcomeIndex: number, amountCents: number, amountGen: number) {
+  function contractMarketArgs(market: Market) {
+    const rules = market.note.length >= 30 ? market.note : `${market.title}. Resolve using public evidence and the listed source data.`;
+    return [
+      String(market.id),
+      market.title,
+      market.category,
+      rules,
+      market.sourceUrl || "https://predicto-arena.vercel.app/api/markets",
+      market.outcomes.map((outcome) => outcome.name.replaceAll(",", " ")).join(",")
+    ];
+  }
+
+  async function submitGenLayerTrade(account: string, market: Market, outcomeIndex: number, amountCents: number, amountGen: number) {
+    const client = createClient({ chain: studionet, account: account as `0x${string}` });
+    await client.connect("studionet");
+    const baseArgs = contractMarketArgs(market);
+    if (tradeSide === "sell") {
+      return client.writeContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        functionName: "sell_position_by_external_id",
+        args: [String(market.id), outcomeIndex, amountCents],
+        value: BigInt(0)
+      });
+    }
+    return client.writeContract({
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      functionName: "ensure_market_and_buy",
+      args: [...baseArgs, outcomeIndex, amountCents],
+      value: parseGEN(amountGen)
+    });
+  }
+
+  async function submitGenLayerLiquidity(account: string, market: Market, amountCents: number, amountGen: number) {
     const client = createClient({ chain: studionet, account: account as `0x${string}` });
     await client.connect("studionet");
     return client.writeContract({
-      address: CONTRACT_ADDRESS,
-      functionName: "buy_position",
-      args: [marketId, outcomeIndex, amountCents],
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      functionName: "ensure_market_and_add_liquidity",
+      args: [...contractMarketArgs(market), amountCents],
       value: parseGEN(amountGen)
     });
   }

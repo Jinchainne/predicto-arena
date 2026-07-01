@@ -8,7 +8,7 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 
 - Live app: https://predicto-arena.vercel.app
 - GitHub: https://github.com/Jinchainne/predicto-arena
-- Contract: `0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad`
+- Contract: `0x700fd6C7B42DE013EEaDeB594346fAA617A0Ecec`
 - Network: studionet
 
 ## Core Experience
@@ -23,7 +23,9 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 - Portfolio, Leaderboard, and Earn Tickets sections.
 - Live market data API at `/api/markets` using Binance/Binance.US public REST, CoinGecko public REST, and GenLayer studionet metadata.
 - Category-specific markets and imagery, including a football visual treatment for World Cup markets.
-- Wallet trade flow that switches/adds GenLayer StudioNet and submits `buy_position` through `genlayer-js` with native `GEN` value.
+- Wallet trade flow that switches/adds GenLayer StudioNet and submits real `GEN` transactions through `genlayer-js`.
+- GenLayer market factory that mirrors live API markets on-chain on the first trade.
+- AMM-style protocol methods for buy, sell, add liquidity, quote reads, oracle resolution, and winning-claim accounting.
 - DEX-style ticket with market/limit orders, slippage control, quick sizes, transaction timeline, liquidity panel, enhanced order book, depth bars, and recent fills.
 - Market creation API through `POST /api/markets`.
 - Trade ticket API through `POST /api/trades`.
@@ -35,9 +37,9 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 
 Prediction markets need transparent resolution. Predicto Arena is built around a GenLayer-style oracle flow where public sources, market rules, and AI-assisted evidence review can be used to resolve outcomes with stronger transparency than a centralized moderator.
 
-The deployed GenLayer contract supports market creation, position buying, public-source resolution, and view methods for markets, outcomes, and positions.
+The deployed GenLayer contract supports market creation, external market mapping, AMM-style buying and selling, liquidity provision, quote reads, public-source resolution, and claim accounting for resolved winning positions.
 
-TradingView is embedded as the live chart surface. Price/market APIs come from Binance/Binance.US and CoinGecko public APIs, while the GenLayer contract is used for the prediction market creation, buying, and resolution design.
+TradingView is embedded as the live chart surface. Price/market APIs come from Binance/Binance.US and CoinGecko public APIs, while the GenLayer contract anchors the prediction market factory, trading, liquidity, and resolution layer.
 
 ## Run Locally
 
@@ -50,7 +52,7 @@ npm run dev
 ## Environment
 
 ```env
-NEXT_PUBLIC_CONTRACT_ADDRESS=0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x700fd6C7B42DE013EEaDeB594346fAA617A0Ecec
 NEXT_PUBLIC_GENLAYER_CHAIN=studionet
 AI_API_KEY=your_server_side_ai_key
 AI_BASE_URL=https://api.groq.com/openai/v1

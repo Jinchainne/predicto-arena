@@ -15,7 +15,7 @@ The deploy script waits for finalization, checks execution success, extracts the
 Set Vercel production variables:
 
 ```env
-NEXT_PUBLIC_CONTRACT_ADDRESS=0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x700fd6C7B42DE013EEaDeB594346fAA617A0Ecec
 NEXT_PUBLIC_GENLAYER_CHAIN=studionet
 AI_API_KEY=your_server_side_ai_key
 AI_BASE_URL=https://api.groq.com/openai/v1
