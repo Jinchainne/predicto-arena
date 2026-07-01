@@ -642,14 +642,15 @@ export default function Home() {
   }, [activeCategory, marketData, search]);
 
   const activeMarket = marketData.find((market) => market.id === activeMarketId) ?? marketData[0] ?? seedMarkets[0];
-  const selectedOutcome = activeMarket.outcomes.find((outcome) => outcome.name === tradeOutcome) ?? activeMarket.outcomes[0];
+  const activeIsFootball = isFootballMarket(activeMarket);
+  const displayOutcomes = useMemo(() => activeIsFootball ? buildWorldCupOutcomes(activeMarket) : activeMarket.outcomes, [activeIsFootball, activeMarket]);
+  const selectedOutcome = displayOutcomes.find((outcome) => outcome.name === tradeOutcome) ?? displayOutcomes[0] ?? activeMarket.outcomes[0];
   const executionPrice = orderType === "limit" ? Number(limitPrice || selectedOutcome.price) : selectedOutcome.price;
   const estimatedShares = Number(amount || 0) / Math.max(0.01, executionPrice / 100);
   const maxSlippageCost = (Number(amount || 0) * Number(slippage || 0)) / 100;
   const heroCategory = activeCategory === "All" ? activeMarket.category : activeCategory;
   const heroImage = categoryImages[heroCategory] ?? categoryImages.All;
   const contextLocation = inferWeatherLocation(activeMarket, tradeOutcome);
-  const activeIsFootball = isFootballMarket(activeMarket);
 
   useEffect(() => {
     let cancelled = false;
@@ -804,7 +805,7 @@ export default function Home() {
       const account = walletAddress || (await requestPrimaryAccount());
       await ensureStudioNet();
       await ensureGenLayerSnap();
-      const outcomeIndex = Math.max(1, activeMarket.outcomes.findIndex((outcome) => outcome.name === tradeOutcome) + 1);
+      const outcomeIndex = Math.max(1, displayOutcomes.findIndex((outcome) => outcome.name === tradeOutcome) + 1);
       const amountCents = Math.max(1, Math.round(amountNumber * 100));
       const txHash = await submitGenLayerTrade(account, activeMarket, outcomeIndex, amountCents, amountNumber);
       setTxSteps(["Wallet confirmed", "GenLayer transaction sent", shortHash(txHash)]);
@@ -1092,13 +1093,14 @@ export default function Home() {
 
   function contractMarketArgs(market: Market) {
     const rules = market.note.length >= 30 ? market.note : `${market.title}. Resolve using public evidence and the listed source data.`;
+    const outcomes = isFootballMarket(market) ? buildWorldCupOutcomes(market) : market.outcomes;
     return [
       String(market.id),
       market.title,
       market.category,
       rules,
       market.sourceUrl || "https://predicto-arena.vercel.app/api/markets",
-      market.outcomes.map((outcome) => outcome.name.replaceAll(",", " ")).join(",")
+      outcomes.map((outcome) => outcome.name.replaceAll(",", " ")).join(",")
     ];
   }
 
@@ -1217,20 +1219,23 @@ export default function Home() {
                 <button onClick={openTradeTicket}><Activity size={16} />Trade now</button>
               </div>
               <div className={activeIsFootball ? "feature-grid football-grid" : "feature-grid"}>
-                <div className={activeIsFootball ? "outcome-stack football-picker" : "outcome-stack"}>
-                  {activeMarket.outcomes.map((outcome) => (
-                    <button
-                      key={outcome.name}
-                      className={tradeOutcome === outcome.name ? "outcome selected" : "outcome"}
-                      onClick={() => setTradeOutcome(outcome.name)}
-                    >
-                      {activeIsFootball && <b><img src={flagForOutcome(outcome.name)} alt="" /></b>}
-                      <span>{outcome.name}</span>
-                      <strong>{outcome.price}c</strong>
-                      <em className={outcome.side}>{outcome.change}</em>
-                    </button>
-                  ))}
-                </div>
+                {activeIsFootball ? (
+                  <WorldCupOutcomeTicker outcomes={displayOutcomes} selected={tradeOutcome} onSelect={setTradeOutcome} />
+                ) : (
+                  <div className="outcome-stack">
+                    {displayOutcomes.map((outcome) => (
+                      <button
+                        key={outcome.name}
+                        className={tradeOutcome === outcome.name ? "outcome selected" : "outcome"}
+                        onClick={() => setTradeOutcome(outcome.name)}
+                      >
+                        <span>{outcome.name}</span>
+                        <strong>{outcome.price}c</strong>
+                        <em className={outcome.side}>{outcome.change}</em>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {activeIsFootball ? (
                   <FootballEventBoard market={activeMarket} selectedOutcome={tradeOutcome} feed={worldCupFeed} feedStatus={worldCupFeedStatus} />
                 ) : isCryptoMarket(activeMarket) ? (
@@ -1378,6 +1383,43 @@ function TradingViewChart({ market }: { market: Market }) {
       src={src}
       allowFullScreen
     />
+  );
+}
+
+function WorldCupOutcomeTicker({
+  outcomes,
+  selected,
+  onSelect
+}: {
+  outcomes: Market["outcomes"];
+  selected: string;
+  onSelect: (outcome: string) => void;
+}) {
+  const repeated = [...outcomes, ...outcomes];
+  return (
+    <div className="worldcup-outcome-ticker">
+      <div className="ticker-title">
+        <span><Trophy size={14} />All World Cup teams</span>
+        <strong>Hover to pause, click a team to trade</strong>
+      </div>
+      <div className="worldcup-outcome-rail">
+        <div className="worldcup-outcome-track">
+          {repeated.map((outcome, index) => (
+            <button
+              key={`${outcome.name}-${index}`}
+              type="button"
+              className={selected === outcome.name ? "team-odd selected" : "team-odd"}
+              onClick={() => onSelect(outcome.name)}
+            >
+              <b><img src={flagForOutcome(outcome.name)} alt="" /></b>
+              <span>{outcome.name}</span>
+              <strong>{outcome.price}c</strong>
+              <em className={outcome.side}>{outcome.change}</em>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1707,6 +1749,38 @@ function isFootballMarket(market: Market) {
 
 function isCryptoMarket(market: Market) {
   return market.category === "Crypto" || ["Price", "Fundamentals", "Binance"].includes(market.tag);
+}
+
+function buildWorldCupOutcomes(market: Market): Market["outcomes"] {
+  const seeded = new Map(market.outcomes.map((outcome) => [outcome.name.toLowerCase(), outcome]));
+  const favoritePrices: Record<string, number> = {
+    France: 31,
+    Argentina: 24,
+    Brazil: 18,
+    England: 12,
+    Spain: 11,
+    Portugal: 10,
+    Germany: 9,
+    Netherlands: 8,
+    Belgium: 7,
+    USA: 6,
+    Mexico: 5,
+    Canada: 4
+  };
+
+  return worldCupTeams.map((team, index) => {
+    const existing = seeded.get(team.name.toLowerCase());
+    if (existing) return existing;
+    const price = favoritePrices[team.name] ?? Math.max(1, 7 - Math.floor(index / 7));
+    const changeValue = ((index % 5) - 2) * 0.7;
+    const change = `${changeValue >= 0 ? "+" : ""}${changeValue.toFixed(1)}%`;
+    return {
+      name: team.name,
+      price,
+      change,
+      side: changeValue >= 0 ? "up" : "down"
+    };
+  });
 }
 
 function flagUrl(code: string) {

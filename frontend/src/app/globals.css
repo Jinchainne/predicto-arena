@@ -17,9 +17,11 @@
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 45% -10%, rgba(239,60,255,.22), transparent 28%),
-    linear-gradient(135deg, rgba(255,255,255,.035) 25%, transparent 25%) 0 0 / 22px 22px,
+    radial-gradient(circle at 18% 8%, rgba(239,60,255,.12), transparent 30%),
+    radial-gradient(circle at 86% 18%, rgba(74,222,128,.07), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,.025), transparent 220px),
     var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   font-family: "Trebuchet MS", Verdana, sans-serif;
 }
@@ -262,13 +264,14 @@ svg { flex-shrink: 0; }
   right: 0;
   bottom: 34px;
   pointer-events: none;
-  opacity: .62;
+  opacity: .34;
   background:
-    radial-gradient(circle at 18% 30%, rgba(239,60,255,.24), transparent 20%),
-    radial-gradient(circle at 82% 58%, rgba(74,222,128,.16), transparent 22%),
-    linear-gradient(90deg, transparent 0 47%, rgba(239,60,255,.16) 48% 52%, transparent 53%),
-    repeating-linear-gradient(115deg, transparent 0 28px, rgba(255,255,255,.055) 29px, transparent 31px);
-  animation: oracleDrift 18s ease-in-out infinite;
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px),
+    radial-gradient(circle at 50% 16%, rgba(239,60,255,.16), transparent 34%),
+    radial-gradient(circle at 76% 72%, rgba(74,222,128,.09), transparent 28%);
+  background-size: 72px 72px, 72px 72px, 100% 100%, 100% 100%;
+  animation: exchangeGridDrift 38s linear infinite;
   z-index: 0;
 }
 .market-shell::after {
@@ -279,14 +282,12 @@ svg { flex-shrink: 0; }
   top: 22vh;
   height: 52vh;
   pointer-events: none;
-  opacity: .48;
+  opacity: .2;
   background:
-    linear-gradient(90deg, transparent, rgba(239,60,255,.22), transparent) 0 20% / 100% 1px no-repeat,
-    linear-gradient(90deg, transparent, rgba(74,222,128,.18), transparent) 0 58% / 100% 1px no-repeat,
-    radial-gradient(circle, rgba(239,60,255,.7) 0 2px, transparent 3px) 12% 26% / 130px 96px,
-    radial-gradient(circle, rgba(74,222,128,.65) 0 2px, transparent 3px) 86% 64% / 150px 110px;
-  filter: blur(.1px);
-  animation: oraclePulse 5.5s ease-in-out infinite;
+    linear-gradient(90deg, transparent, rgba(239,60,255,.18), transparent) 0 18% / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, rgba(74,222,128,.14), transparent) 0 62% / 100% 1px no-repeat;
+  filter: blur(.2px);
+  animation: exchangeScan 9s ease-in-out infinite;
   z-index: 0;
 }
 .left-stage { display: grid; gap: 18px; position: relative; z-index: 1; }
@@ -377,6 +378,105 @@ p { color: var(--muted); }
   background:
     radial-gradient(circle at 15% 20%, rgba(239,60,255,.32), transparent 34%),
     rgba(239,60,255,.13);
+}
+.worldcup-outcome-ticker {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, rgba(74,222,128,.08), rgba(239,60,255,.08)),
+    rgba(255,255,255,.035);
+  overflow: hidden;
+}
+.ticker-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.ticker-title span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--green);
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.ticker-title strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+.worldcup-outcome-rail {
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+}
+.worldcup-outcome-track {
+  width: max-content;
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  animation: teamTickerMove 95s linear infinite;
+}
+.worldcup-outcome-ticker:hover .worldcup-outcome-track {
+  animation-play-state: paused;
+}
+.team-odd {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-width: 190px;
+  height: 78px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: 1fr auto;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 15% 12%, rgba(239,60,255,.18), transparent 36%),
+    rgba(16,8,19,.88);
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+.team-odd:hover {
+  transform: translateY(-3px);
+  border-color: rgba(74,222,128,.55);
+}
+.team-odd.selected {
+  border-color: rgba(239,60,255,.85);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(239,60,255,.35), transparent 38%),
+    rgba(239,60,255,.16);
+}
+.team-odd b {
+  width: 30px;
+  height: 21px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255,255,255,.08);
+  grid-row: span 2;
+}
+.team-odd b img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.team-odd span {
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-odd strong {
+  font-size: 18px;
+}
+.team-odd em {
+  grid-column: 2 / 4;
+  font-size: 12px;
+  font-style: normal;
+  justify-self: end;
 }
 .outcome:hover { transform: translateX(4px); }
 .outcome.selected { border-color: rgba(239,60,255,.65); background: rgba(239,60,255,.12); }
@@ -1212,13 +1312,23 @@ p { color: var(--muted); }
 }
 
 @keyframes oracleDrift {
-  0%, 100% { transform: translate3d(0,0,0); opacity: .48; }
-  50% { transform: translate3d(0,-18px,0); opacity: .7; }
+  0%, 100% { transform: translate3d(0,0,0); opacity: .28; }
+  50% { transform: translate3d(0,-10px,0); opacity: .38; }
 }
 
 @keyframes oraclePulse {
-  0%, 100% { transform: scale(1); opacity: .3; }
-  50% { transform: scale(1.03); opacity: .56; }
+  0%, 100% { transform: scale(1); opacity: .16; }
+  50% { transform: scale(1.01); opacity: .24; }
+}
+
+@keyframes exchangeGridDrift {
+  from { background-position: 0 0, 0 0, 0 0, 0 0; }
+  to { background-position: 72px 72px, 72px 72px, 0 0, 0 0; }
+}
+
+@keyframes exchangeScan {
+  0%, 100% { transform: translateY(-10px); opacity: .14; }
+  50% { transform: translateY(14px); opacity: .24; }
 }
 
 @keyframes marqueeGlow {
@@ -1257,6 +1367,10 @@ p { color: var(--muted); }
   to { transform: translateX(-50%); }
 }
 @keyframes wcTickerMove {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes teamTickerMove {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
