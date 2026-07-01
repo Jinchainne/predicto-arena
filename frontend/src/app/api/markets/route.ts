@@ -36,6 +36,79 @@ const fallbackMarkets: Market[] = [
   }
 ];
 
+const thematicMarkets: Market[] = [
+  {
+    id: 410,
+    title: "2026 World Cup Winner market resolves from official FIFA result?",
+    category: "World Cup",
+    tag: "Football",
+    volume: "$214.80K",
+    liquidity: "$86.20K",
+    closes: "Jul 19, 2026",
+    outcomes: [
+      { name: "France", price: 31, change: "+4.2%", side: "up" },
+      { name: "Argentina", price: 24, change: "-1.1%", side: "down" },
+      { name: "Brazil", price: 18, change: "+2.0%", side: "up" },
+      { name: "England", price: 12, change: "-0.8%", side: "down" }
+    ],
+    spark: [20, 22, 24, 21, 28, 31, 29, 34, 33, 38, 36, 42],
+    note: "Football prediction market. Resolution should use official FIFA tournament result pages and GenLayer source review.",
+    source: "FIFA public result evidence",
+    sourceUrl: "https://www.fifa.com/"
+  },
+  {
+    id: 420,
+    title: "Will a major central bank cut rates before November?",
+    category: "Economy",
+    tag: "Macro",
+    volume: "$53.20K",
+    liquidity: "$25.80K",
+    closes: "Nov 01, 2026",
+    outcomes: [
+      { name: "Yes", price: 57, change: "+1.4%", side: "up" },
+      { name: "No", price: 43, change: "-1.4%", side: "down" }
+    ],
+    spark: [41, 45, 43, 48, 52, 49, 53, 55, 57, 54, 58, 57],
+    note: "Macro prediction market. Resolution uses official central-bank statements and GenLayer oracle review.",
+    source: "Official macro source evidence",
+    sourceUrl: "https://www.federalreserve.gov/"
+  },
+  {
+    id: 430,
+    title: "Will an AI model top public coding benchmarks in Q3?",
+    category: "AI",
+    tag: "Benchmarks",
+    volume: "$71.90K",
+    liquidity: "$33.30K",
+    closes: "Sep 30, 2026",
+    outcomes: [
+      { name: "Yes", price: 52, change: "+2.9%", side: "up" },
+      { name: "No", price: 48, change: "-2.9%", side: "down" }
+    ],
+    spark: [18, 25, 23, 27, 31, 29, 33, 38, 35, 40, 37, 38],
+    note: "AI benchmark market. Resolution uses public leaderboard evidence and GenLayer consensus checks.",
+    source: "Public benchmark evidence",
+    sourceUrl: "https://huggingface.co/spaces"
+  },
+  {
+    id: 440,
+    title: "Will a top music release lead global streaming charts this summer?",
+    category: "Culture",
+    tag: "Music",
+    volume: "$38.00K",
+    liquidity: "$16.90K",
+    closes: "Aug 31, 2026",
+    outcomes: [
+      { name: "Yes", price: 35, change: "+5.6%", side: "up" },
+      { name: "No", price: 65, change: "-5.6%", side: "down" }
+    ],
+    spark: [12, 16, 21, 18, 24, 25, 31, 29, 34, 33, 36, 35],
+    note: "Culture market resolved through public chart methodology and GenLayer source analysis.",
+    source: "Public chart evidence",
+    sourceUrl: "https://www.billboard.com/charts/"
+  }
+];
+
 export const dynamic = "force-dynamic";
 
 function money(value: number) {
@@ -167,7 +240,7 @@ export async function GET() {
     errors.push(error instanceof Error ? error.message : "CoinGecko failed");
   }
 
-  const markets = [genlayerMarket(), ...(liveMarkets.length ? liveMarkets : fallbackMarkets)];
+  const markets = [genlayerMarket(), ...thematicMarkets, ...(liveMarkets.length ? liveMarkets : fallbackMarkets)];
 
   return NextResponse.json({
     source: liveMarkets.length ? "live-market-apis" : "fallback",

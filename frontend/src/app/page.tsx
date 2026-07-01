@@ -24,6 +24,8 @@ import {
   Wallet,
   Zap
 } from "lucide-react";
+import { createClient } from "genlayer-js";
+import { studionet } from "genlayer-js/chains";
 
 type Market = {
   id: number;
@@ -75,6 +77,10 @@ type EthereumProvider = {
   removeListener?: (event: string, handler: (...args: any[]) => void) => void;
 };
 
+const CONTRACT_ADDRESS = "0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad";
+const STUDIO_CHAIN_ID = "0xf22f";
+const STUDIO_RPC_URL = "https://studio.genlayer.com/api";
+
 declare global {
   interface Window {
     ethereum?: EthereumProvider;
@@ -85,6 +91,17 @@ const categories = ["All", "World Cup", "Crypto", "AI", "Politics", "Economy", "
 const navItems = ["Markets", "Portfolio", "Leaderboard", "Earn Tickets"];
 const navIcons = { Markets: ChartCandlestick, Portfolio: ShoppingCart, Leaderboard: Trophy, "Earn Tickets": Gift };
 const categoryIcons = { All: Globe2, "World Cup": Trophy, Crypto: Coins, AI: BrainCircuit, Politics: ShieldCheck, Economy: CircleDollarSign, Sports: Medal, Culture: Sparkles, New: Flame };
+const categoryImages: Record<string, string> = {
+  "World Cup": "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=1400&q=80",
+  Crypto: "https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?auto=format&fit=crop&w=1400&q=80",
+  AI: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1400&q=80",
+  Politics: "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1400&q=80",
+  Economy: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1400&q=80",
+  Sports: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1400&q=80",
+  Culture: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1400&q=80",
+  New: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1400&q=80",
+  All: "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?auto=format&fit=crop&w=1400&q=80"
+};
 
 const seedMarkets: Market[] = [
   {
@@ -225,6 +242,8 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [walletError, setWalletError] = useState("");
+  const [genBalance, setGenBalance] = useState("0.0000");
+  const [walletChain, setWalletChain] = useState("");
   const [createMarket, setCreateMarket] = useState<CreateMarketState>({
     title: "Will GenLayer ship a new public testnet milestone in Q3?",
     category: "AI",
@@ -326,6 +345,8 @@ export default function Home() {
   const activeMarket = marketData.find((market) => market.id === activeMarketId) ?? marketData[0] ?? seedMarkets[0];
   const selectedOutcome = activeMarket.outcomes.find((outcome) => outcome.name === tradeOutcome) ?? activeMarket.outcomes[0];
   const estimatedShares = Number(amount || 0) / Math.max(1, selectedOutcome.price / 100);
+  const heroCategory = activeCategory === "All" ? activeMarket.category : activeCategory;
+  const heroImage = categoryImages[heroCategory] ?? categoryImages.All;
 
   function selectMarket(market: Market) {
     setActiveMarketId(market.id);
@@ -340,8 +361,18 @@ export default function Home() {
   }
 
   async function submitTrade() {
-    setTradeStatus("Submitting trade...");
+    setTradeStatus("Submitting GenLayer transaction...");
     try {
+      if (!walletAddress) {
+        await connectWallet();
+      }
+      const account = walletAddress || (await requestPrimaryAccount());
+      await ensureStudioNet();
+      const outcomeIndex = Math.max(1, activeMarket.outcomes.findIndex((outcome) => outcome.name === tradeOutcome) + 1);
+      const amountNumber = Number(amount || 0);
+      const amountCents = Math.max(1, Math.round(amountNumber * 100));
+      const txHash = await submitGenLayerTrade(account, activeMarket.id, outcomeIndex, amountCents, amountNumber);
+
       const response = await fetch("/api/trades", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -350,7 +381,7 @@ export default function Home() {
           outcome: tradeOutcome,
           side: tradeSide,
           amount: Number(amount || 0),
-          wallet: walletAddress
+          wallet: account
         })
       });
       const result = await response.json();
@@ -371,8 +402,9 @@ export default function Home() {
       ]);
       updateMission("trade-3", 1);
       updateMission("liquidity-100", Number(amount || 0));
-      setTradeStatus(`Accepted ${result.ticketId}`);
-      setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} for $${amount || "0"} via API`, ...items].slice(0, 6));
+      await refreshWalletState(account);
+      setTradeStatus(`GenLayer tx ${shortHash(txHash)} / ticket ${result.ticketId}`);
+      setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} with ${amount || "0"} GEN on StudioNet`, ...items].slice(0, 6));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Trade failed";
       setTradeStatus(message);
@@ -461,12 +493,76 @@ export default function Home() {
       const firstAccount = Array.isArray(accounts) && typeof accounts[0] === "string" ? accounts[0] : "";
       if (!firstAccount) throw new Error("No wallet account returned");
       setWalletAddress(firstAccount);
+      await ensureStudioNet();
+      await refreshWalletState(firstAccount);
       setFeed((items) => [`Wallet connected ${shortAddress(firstAccount)}`, ...items].slice(0, 6));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Wallet connection rejected";
       setWalletError(message);
       setFeed((items) => [`Wallet error: ${message}`, ...items].slice(0, 6));
     }
+  }
+
+  async function requestPrimaryAccount() {
+    const accounts = await window.ethereum?.request({ method: "eth_requestAccounts" });
+    const account = Array.isArray(accounts) && typeof accounts[0] === "string" ? accounts[0] : "";
+    if (!account) throw new Error("Connect wallet first");
+    setWalletAddress(account);
+    return account;
+  }
+
+  async function ensureStudioNet() {
+    if (!window.ethereum) throw new Error("Wallet not found");
+    const currentChainId = await window.ethereum.request({ method: "eth_chainId" });
+    if (currentChainId === STUDIO_CHAIN_ID) {
+      setWalletChain("GenLayer StudioNet");
+      return;
+    }
+
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: STUDIO_CHAIN_ID }]
+      });
+    } catch (error: any) {
+      if (error?.code !== 4902) throw error;
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: STUDIO_CHAIN_ID,
+            chainName: "GenLayer Studio Network",
+            rpcUrls: [STUDIO_RPC_URL],
+            nativeCurrency: { name: "GEN Token", symbol: "GEN", decimals: 18 },
+            blockExplorerUrls: ["https://genlayer-explorer.vercel.app"]
+          }
+        ]
+      });
+    }
+    setWalletChain("GenLayer StudioNet");
+  }
+
+  async function refreshWalletState(account: string) {
+    if (!window.ethereum) return;
+    const [balanceHex, chainId] = await Promise.all([
+      window.ethereum.request({ method: "eth_getBalance", params: [account, "latest"] }),
+      window.ethereum.request({ method: "eth_chainId" })
+    ]);
+    if (typeof balanceHex === "string") {
+      setGenBalance(formatGEN(BigInt(balanceHex)));
+    }
+    setWalletChain(chainId === STUDIO_CHAIN_ID ? "GenLayer StudioNet" : String(chainId));
+  }
+
+  async function submitGenLayerTrade(account: string, marketId: number, outcomeIndex: number, amountCents: number, amountGen: number) {
+    const client = createClient({ chain: studionet, account: account as `0x${string}` });
+    await client.connect("studionet");
+    return client.writeContract({
+      address: CONTRACT_ADDRESS,
+      functionName: "buy_position",
+      args: [marketId, outcomeIndex, amountCents],
+      value: parseGEN(amountGen)
+    });
   }
 
   return (
@@ -488,8 +584,8 @@ export default function Home() {
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search markets..." />
         </label>
         <button className="deposit pulse-action" onClick={connectWallet}><Wallet size={16} />{walletAddress ? "Connected" : "Connect"}</button>
-        <div className="wallet-pill">{tickets} Tickets</div>
-        <div className="wallet-pill">${positions.reduce((sum, item) => sum + item.amount, 0).toFixed(2)} Vol</div>
+        <div className="wallet-pill">{genBalance} GEN</div>
+        <div className="wallet-pill">{walletChain || "StudioNet"}</div>
         <button className={walletError ? "wallet-address wallet-alert" : "wallet-address"} onClick={connectWallet}>
           {walletAddress ? shortAddress(walletAddress) : walletError || (dataStatus === "loading" ? "Loading API" : dataStatus === "live" ? "API Live" : "Seed data")}
         </button>
@@ -510,9 +606,9 @@ export default function Home() {
       {activeNav === "Markets" && (
         <section className="market-shell">
           <section className="left-stage">
-            <div className="live-strip">
-              <span><Zap size={15} /> Live exchange APIs</span>
-              <strong>GenLayer studionet oracle-ready markets</strong>
+            <div className="category-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(14,6,18,.96), rgba(14,6,18,.58)), url(${heroImage})` }}>
+              <span><Zap size={15} /> {heroCategory} live market</span>
+              <strong>{heroCategory === "World Cup" ? "Football markets with real match-themed visuals" : "GenLayer studionet oracle-ready markets"}</strong>
               <button onClick={() => setActiveNav("Create")}>List a market <ChevronRight size={15} /></button>
             </div>
             <div className="feature-market">
@@ -823,6 +919,23 @@ function CreateMarketView({
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function shortHash(hash: string) {
+  return `${hash.slice(0, 8)}...${hash.slice(-6)}`;
+}
+
+function parseGEN(value: number) {
+  const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
+  return BigInt(Math.round(safe * 1_000_000)) * BigInt("1000000000000");
+}
+
+function formatGEN(value: bigint) {
+  const base = BigInt("1000000000000000000");
+  const fractionBase = BigInt("100000000000000");
+  const whole = value / base;
+  const fraction = (value % base) / fractionBase;
+  return `${whole}.${fraction.toString().padStart(4, "0")}`;
 }
 
 function OrderBook({ market }: { market: Market }) {
