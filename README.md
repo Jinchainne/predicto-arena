@@ -15,6 +15,8 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 
 - Multi-layer market navigation with top-level sections and category filters.
 - Featured market board with outcome prices and probability chart.
+- Full TradingView embedded chart for BTC/ETH/BNB/SOL-style crypto market symbols.
+- Animated marketplace-style UX with icon menus, live ticker strip, hover motion, and action feedback.
 - Market cards that open a detailed trade drawer.
 - Trade ticket with buy/sell side, amount, estimated shares, and payout.
 - Nested drawer tabs for Trade, Book, Rules, and Oracle.
@@ -24,6 +26,7 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 - Trade ticket API through `POST /api/trades`.
 - EVM wallet connection through `window.ethereum` for MetaMask-compatible wallets.
 - In-app AI market analyst through `/api/ask` for market explanation and oracle analysis.
+- Interactive Portfolio, Leaderboard, Earn Tickets, Market/Outcome/Volume tabs, and session persistence through `localStorage`.
 
 ## GenLayer Fit
 
@@ -31,7 +34,7 @@ Prediction markets need transparent resolution. Predicto Arena is built around a
 
 The deployed GenLayer contract supports market creation, position buying, public-source resolution, and view methods for markets, outcomes, and positions.
 
-TradingView is supported as a charting/widget direction rather than a public REST price API; live price data in this implementation comes from Binance/Binance.US and CoinGecko public APIs.
+TradingView is embedded as the live chart surface. Price/market APIs come from Binance/Binance.US and CoinGecko public APIs, while the GenLayer contract is used for the prediction market creation, buying, and resolution design.
 
 ## Run Locally
 

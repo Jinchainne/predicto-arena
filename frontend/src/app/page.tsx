@@ -1,6 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  BarChart3,
+  Bot,
+  BrainCircuit,
+  ChartCandlestick,
+  ChevronRight,
+  CircleDollarSign,
+  Coins,
+  Flame,
+  Gauge,
+  Gift,
+  Globe2,
+  Medal,
+  Plus,
+  Search,
+  ShieldCheck,
+  ShoppingCart,
+  Sparkles,
+  Trophy,
+  Wallet,
+  Zap
+} from "lucide-react";
 
 type Market = {
   id: number;
@@ -60,6 +83,8 @@ declare global {
 
 const categories = ["All", "World Cup", "Crypto", "AI", "Politics", "Economy", "Sports", "Culture", "New"];
 const navItems = ["Markets", "Portfolio", "Leaderboard", "Earn Tickets"];
+const navIcons = { Markets: ChartCandlestick, Portfolio: ShoppingCart, Leaderboard: Trophy, "Earn Tickets": Gift };
+const categoryIcons = { All: Globe2, "World Cup": Trophy, Crypto: Coins, AI: BrainCircuit, Politics: ShieldCheck, Economy: CircleDollarSign, Sports: Medal, Culture: Sparkles, New: Flame };
 
 const seedMarkets: Market[] = [
   {
@@ -196,6 +221,7 @@ export default function Home() {
   const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("25");
   const [drawerTab, setDrawerTab] = useState("Trade");
+  const [marketView, setMarketView] = useState<"Markets" | "Outcomes" | "Volume">("Markets");
   const [search, setSearch] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [walletError, setWalletError] = useState("");
@@ -306,6 +332,11 @@ export default function Home() {
     setTradeOutcome(market.outcomes[0].name);
     setDrawerTab("Trade");
     setFeed((items) => [`Opened ${market.title}`, ...items].slice(0, 6));
+  }
+
+  function openMarketView(view: "Markets" | "Outcomes" | "Volume") {
+    setMarketView(view);
+    setFeed((items) => [`Switched market board to ${view}`, ...items].slice(0, 6));
   }
 
   async function submitTrade() {
@@ -441,17 +472,22 @@ export default function Home() {
   return (
     <main className="terminal">
       <header className="topbar">
-        <div className="logo-mark">PX</div>
+        <div className="logo-mark"><span /></div>
         <nav className="main-nav">
-          {navItems.map((item) => (
-            <button key={item} className={activeNav === item ? "active" : ""} onClick={() => setActiveNav(item)}>{item}</button>
-          ))}
+          {navItems.map((item) => {
+            const Icon = navIcons[item as keyof typeof navIcons];
+            return (
+              <button key={item} className={activeNav === item ? "active" : ""} onClick={() => setActiveNav(item)}>
+                <Icon size={16} />{item}
+              </button>
+            );
+          })}
         </nav>
         <label className="search">
-          <span>Search</span>
+          <Search size={14} />
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search markets..." />
         </label>
-        <button className="deposit" onClick={connectWallet}>{walletAddress ? "Connected" : "+ Connect"}</button>
+        <button className="deposit pulse-action" onClick={connectWallet}><Wallet size={16} />{walletAddress ? "Connected" : "Connect"}</button>
         <div className="wallet-pill">{tickets} Tickets</div>
         <div className="wallet-pill">${positions.reduce((sum, item) => sum + item.amount, 0).toFixed(2)} Vol</div>
         <button className={walletError ? "wallet-address wallet-alert" : "wallet-address"} onClick={connectWallet}>
@@ -460,15 +496,25 @@ export default function Home() {
       </header>
 
       <section className="category-strip">
-        {categories.map((category) => (
-          <button key={category} className={activeCategory === category ? "selected" : ""} onClick={() => setActiveCategory(category)}>{category}</button>
-        ))}
-        <button className="new-market" onClick={() => setActiveNav("Create")}>Create market</button>
+        {categories.map((category) => {
+          const Icon = categoryIcons[category as keyof typeof categoryIcons];
+          return (
+            <button key={category} className={activeCategory === category ? "selected" : ""} onClick={() => setActiveCategory(category)}>
+              <Icon size={15} />{category}
+            </button>
+          );
+        })}
+        <button className="new-market" onClick={() => setActiveNav("Create")}><Plus size={15} />Create market</button>
       </section>
 
       {activeNav === "Markets" && (
         <section className="market-shell">
           <section className="left-stage">
+            <div className="live-strip">
+              <span><Zap size={15} /> Live exchange APIs</span>
+              <strong>GenLayer studionet oracle-ready markets</strong>
+              <button onClick={() => setActiveNav("Create")}>List a market <ChevronRight size={15} /></button>
+            </div>
             <div className="feature-market">
               <div className="feature-head">
                 <div>
@@ -476,7 +522,7 @@ export default function Home() {
                   <h1>{activeMarket.title}</h1>
                   <p>{activeMarket.note}</p>
                 </div>
-                <button onClick={submitTrade}>Trade now</button>
+                <button onClick={submitTrade}><Activity size={16} />Trade now</button>
               </div>
               <div className="feature-grid">
                 <div className="outcome-stack">
@@ -492,17 +538,13 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
-                <div className="chart-panel">
-                  <svg viewBox="0 0 240 100" role="img" aria-label="Market probability chart">
-                    <path d="M 0 90 H 240" />
-                    <path d="M 0 60 H 240" />
-                    <path d="M 0 30 H 240" />
-                    <path className="spark" d={sparkPath(activeMarket.spark)} />
-                  </svg>
+                <div className="chart-panel tradingview-panel">
+                  <TradingViewChart market={activeMarket} />
                   <div className="chart-meta">
                     <span>Vol {activeMarket.volume}</span>
                     <span>Liq {activeMarket.liquidity}</span>
                     <span>Close {activeMarket.closes}</span>
+                    <span>{activeMarket.source ?? "Predicto"}</span>
                   </div>
                 </div>
               </div>
@@ -511,37 +553,18 @@ export default function Home() {
             <div className="section-title">
               <h2>{activeCategory === "All" ? "Trending markets" : `${activeCategory} markets`}</h2>
               <div className="view-tabs">
-                <button className="active">Markets</button>
-                <button>Outcomes</button>
-                <button>Volume</button>
+                {(["Markets", "Outcomes", "Volume"] as const).map((view) => (
+                  <button key={view} className={marketView === view ? "active" : ""} onClick={() => openMarketView(view)}>
+                    {view === "Markets" && <ChartCandlestick size={15} />}
+                    {view === "Outcomes" && <Gauge size={15} />}
+                    {view === "Volume" && <BarChart3 size={15} />}
+                    {view}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="market-grid">
-              {filteredMarkets.map((market) => (
-                <article key={market.id} className={market.id === activeMarket.id ? "market-card focused" : "market-card"} onClick={() => selectMarket(market)}>
-                  <div className="market-card-head">
-                    <div className="token">{market.category.slice(0, 2).toUpperCase()}</div>
-                    <div>
-                      <h3>{market.title}</h3>
-                      <p>{market.tag} / {market.source ?? "Predicto"} / closes {market.closes}</p>
-                    </div>
-                  </div>
-                  <div className="mini-outcomes">
-                    {market.outcomes.slice(0, 3).map((outcome) => (
-                      <div key={outcome.name}>
-                        <span>{outcome.name}</span>
-                        <strong>{outcome.price}c</strong>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="market-foot">
-                    <span>Vol {market.volume}</span>
-                    <span>Liq {market.liquidity}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
+            <MarketBoard view={marketView} markets={filteredMarkets} activeMarketId={activeMarket.id} onSelectMarket={selectMarket} />
           </section>
 
           <aside className="right-dock">
@@ -565,7 +588,7 @@ export default function Home() {
                     <span>Est. shares</span><strong>{estimatedShares.toFixed(2)}</strong>
                     <span>Max payout</span><strong>${(estimatedShares).toFixed(2)}</strong>
                   </div>
-                  <button className="submit-trade" onClick={submitTrade}>{tradeSide === "buy" ? "Buy shares" : "Sell shares"}</button>
+                  <button className="submit-trade pulse-action" onClick={submitTrade}><ShoppingCart size={16} />{tradeSide === "buy" ? "Buy shares" : "Sell shares"}</button>
                   {tradeStatus && <span className="api-note">{tradeStatus}</span>}
                 </div>
               )}
@@ -608,13 +631,113 @@ export default function Home() {
       {activeNav === "Earn Tickets" && <Tickets missions={missions} onClaim={claimMission} />}
 
       <footer className="status-bar">
-        <span className="online-dot" /> Local 11:32:48
+        <span className="online-dot" /> Live session
         <span>English</span>
         <span>Docs</span>
         <span>GenLayer oracle simulation</span>
       </footer>
     </main>
   );
+}
+
+function tradingViewSymbol(market: Market) {
+  const text = `${market.title} ${market.tag}`.toUpperCase();
+  if (text.includes("ETHEREUM") || text.includes("ETH")) return "BINANCE:ETHUSDT";
+  if (text.includes("BNB")) return "BINANCE:BNBUSDT";
+  if (text.includes("SOLANA") || text.includes("SOL")) return "BINANCE:SOLUSDT";
+  return "BINANCE:BTCUSDT";
+}
+
+function TradingViewChart({ market }: { market: Market }) {
+  const symbol = tradingViewSymbol(market);
+  const src = `https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(symbol)}&interval=60&hidesidetoolbar=1&symboledit=1&saveimage=0&toolbarbg=1b1021&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&hideideas=1`;
+
+  return (
+    <iframe
+      key={symbol}
+      className="tradingview-frame"
+      title={`TradingView chart ${symbol}`}
+      src={src}
+      allowFullScreen
+    />
+  );
+}
+
+function MarketBoard({
+  view,
+  markets,
+  activeMarketId,
+  onSelectMarket
+}: {
+  view: "Markets" | "Outcomes" | "Volume";
+  markets: Market[];
+  activeMarketId: number;
+  onSelectMarket: (market: Market) => void;
+}) {
+  if (view === "Outcomes") {
+    return (
+      <div className="outcome-board">
+        {markets.flatMap((market) =>
+          market.outcomes.map((outcome) => (
+            <button key={`${market.id}-${outcome.name}`} onClick={() => onSelectMarket(market)}>
+              <span>{market.title}</span>
+              <strong>{outcome.name}</strong>
+              <em className={outcome.side}>{outcome.price}c {outcome.change}</em>
+            </button>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  if (view === "Volume") {
+    return (
+      <div className="volume-board">
+        {[...markets].sort((a, b) => parseMoney(b.volume) - parseMoney(a.volume)).map((market) => (
+          <button key={market.id} onClick={() => onSelectMarket(market)}>
+            <span>{market.source ?? market.tag}</span>
+            <strong>{market.title}</strong>
+            <em>{market.volume}</em>
+            <div><span style={{ width: `${Math.min(100, parseMoney(market.volume) / Math.max(1, parseMoney(markets[0]?.volume ?? "$1")) * 100)}%` }} /></div>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="market-grid">
+      {markets.map((market) => (
+        <article key={market.id} className={market.id === activeMarketId ? "market-card focused" : "market-card"} onClick={() => onSelectMarket(market)}>
+          <div className="market-card-head">
+            <div className="token">{market.category.slice(0, 2).toUpperCase()}</div>
+            <div>
+              <h3>{market.title}</h3>
+              <p>{market.tag} / {market.source ?? "Predicto"} / closes {market.closes}</p>
+            </div>
+          </div>
+          <div className="mini-outcomes">
+            {market.outcomes.slice(0, 3).map((outcome) => (
+              <div key={outcome.name}>
+                <span>{outcome.name}</span>
+                <strong>{outcome.price}c</strong>
+              </div>
+            ))}
+          </div>
+          <div className="market-foot">
+            <span>Vol {market.volume}</span>
+            <span>Liq {market.liquidity}</span>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function parseMoney(value: string) {
+  const normalized = value.replace("$", "").replace(",", "").trim();
+  const multiplier = normalized.endsWith("B") ? 1_000_000_000 : normalized.endsWith("M") ? 1_000_000 : normalized.endsWith("K") ? 1_000 : 1;
+  return Number(normalized.replace(/[BMK]/g, "")) * multiplier || 0;
 }
 
 function AiPanel({
@@ -632,9 +755,9 @@ function AiPanel({
 }) {
   return (
     <div className="ai-panel">
-      <h2>AI market analyst</h2>
+      <h2><Bot size={18} />AI market analyst</h2>
       <textarea value={question} onChange={(event) => onQuestion(event.target.value)} />
-      <button onClick={onAsk} disabled={loading}>{loading ? "Analyzing..." : "Ask AI"}</button>
+      <button onClick={onAsk} disabled={loading}>{loading ? "Analyzing..." : <><Sparkles size={16} />Ask AI</>}</button>
       {answer && <p>{answer}</p>}
     </div>
   );
@@ -651,7 +774,7 @@ function GenLayerPanel({
 }) {
   return (
     <div className="genlayer-panel">
-      <h2>GenLayer network</h2>
+      <h2><ShieldCheck size={18} />GenLayer network</h2>
       <div><span>Network</span><strong>{network}</strong></div>
       <div><span>Contract</span><strong>{shortAddress(contractAddress)}</strong></div>
       <div><span>Methods</span><strong>create / buy / resolve</strong></div>
@@ -692,7 +815,7 @@ function CreateMarketView({
         <label>Close date<input value={value.closes} onChange={(event) => update("closes", event.target.value)} /></label>
         <label className="wide">Outcomes<input value={value.outcomes} onChange={(event) => update("outcomes", event.target.value)} /></label>
         <label className="wide">Resolution rules<textarea value={value.rules} onChange={(event) => update("rules", event.target.value)} /></label>
-        <button onClick={onSubmit} disabled={busy}>{busy ? "Creating..." : "Create market via API"}</button>
+        <button onClick={onSubmit} disabled={busy}>{busy ? "Creating..." : <><Plus size={16} />Create market via API</>}</button>
       </div>
     </section>
   );
@@ -747,12 +870,12 @@ function Portfolio({ feed, positions }: { feed: string[]; positions: Position[] 
   return (
     <section className="portfolio-view">
       <div className="portfolio-card">
-        <span>Total value</span>
+        <span><Wallet size={15} /> Total value</span>
         <strong>${totalValue.toFixed(2)}</strong>
         <em>{exposure.toFixed(2)} active shares</em>
       </div>
       <div className="portfolio-table">
-        <h2>Open positions</h2>
+        <h2><ShoppingCart size={18} />Open positions</h2>
         {positions.length === 0 && <p>No positions yet. Place a trade from the Markets tab.</p>}
         {positions.map((position) => (
           <div key={position.id}>
@@ -763,7 +886,7 @@ function Portfolio({ feed, positions }: { feed: string[]; positions: Position[] 
         ))}
       </div>
       <div className="activity-feed">
-        <h2>Activity</h2>
+        <h2><Activity size={18} />Activity</h2>
         {feed.map((item) => <span key={item}>{item}</span>)}
       </div>
     </section>
@@ -828,7 +951,7 @@ function Tickets({ missions, onClaim }: { missions: Mission[]; onClaim: (id: str
           <div className="progress-track"><span style={{ width: `${Math.min(100, (mission.progress / mission.target) * 100)}%` }} /></div>
           <p>{Math.min(mission.progress, mission.target).toFixed(mission.target > 10 ? 0 : 0)} / {mission.target} progress</p>
           <button disabled={!complete || mission.claimed} onClick={() => onClaim(mission.id)}>
-            {mission.claimed ? "Claimed" : complete ? `Claim ${mission.reward} tickets` : "In progress"}
+            {mission.claimed ? "Claimed" : complete ? <><Gift size={15} />Claim {mission.reward} tickets</> : "In progress"}
           </button>
         </article>
         );
