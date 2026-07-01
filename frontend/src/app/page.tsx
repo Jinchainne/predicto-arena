@@ -872,7 +872,7 @@ export default function Home() {
                 </div>
                 <button onClick={openTradeTicket}><Activity size={16} />Trade now</button>
               </div>
-              <div className="feature-grid">
+              <div className="feature-grid has-context">
                 <div className="outcome-stack">
                   {activeMarket.outcomes.map((outcome) => (
                     <button

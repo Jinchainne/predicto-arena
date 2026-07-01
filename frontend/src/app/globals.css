@@ -230,6 +230,10 @@ p { color: var(--muted); }
   gap: 18px;
   padding: 16px;
 }
+.feature-grid.has-context {
+  grid-template-columns: 280px minmax(360px, 1fr) 320px;
+  align-items: stretch;
+}
 .outcome-stack { display: grid; gap: 10px; }
 .outcome {
   display: grid;
@@ -273,13 +277,9 @@ p { color: var(--muted); }
 .chart-panel .spark { stroke: var(--pink); stroke-width: 4; filter: drop-shadow(0 0 10px rgba(239,60,255,.8)); }
 .chart-meta { display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
 .live-context {
-  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
-  gap: 16px;
-}
-.live-context:not(.world-cup-context) {
   grid-template-columns: 1fr;
+  gap: 16px;
 }
 .video-card, .weather-card {
   border: 1px solid var(--line);
@@ -846,7 +846,7 @@ p { color: var(--muted); }
 @media (max-width: 1180px) {
   .topbar { grid-template-columns: 44px 1fr; height: auto; padding: 14px; }
   .main-nav, .search, .deposit, .wallet-pill, .wallet-address { grid-column: span 2; justify-self: stretch; max-width: none; }
-  .market-shell, .feature-grid, .portfolio-view, .live-context { grid-template-columns: 1fr; }
+  .market-shell, .feature-grid, .feature-grid.has-context, .portfolio-view, .live-context { grid-template-columns: 1fr; }
   .category-hero { grid-template-columns: 1fr; }
   .market-grid, .tickets-view, .create-form, .outcome-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
