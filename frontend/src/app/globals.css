@@ -713,6 +713,18 @@ p { color: var(--muted); }
   font-size: 13px;
   line-height: 1.5;
 }
+.snap-help {
+  display: inline-flex;
+  justify-content: center;
+  border: 1px solid rgba(239,60,255,.45);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #ffd0ff;
+  background: rgba(239,60,255,.1);
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
 
 .portfolio-view, .leaderboard-view, .tickets-view, .create-view {
   max-width: 1180px;

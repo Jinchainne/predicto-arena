@@ -90,7 +90,7 @@ type Mission = {
 };
 
 type EthereumProvider = {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  request: (args: { method: string; params?: unknown[] | Record<string, unknown> }) => Promise<unknown>;
   on?: (event: string, handler: (...args: any[]) => void) => void;
   removeListener?: (event: string, handler: (...args: any[]) => void) => void;
 };
@@ -98,6 +98,8 @@ type EthereumProvider = {
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0xD7d8740903A0E8c5d587F262f9c96D121F1D42Ad";
 const STUDIO_CHAIN_ID = "0xf22f";
 const STUDIO_RPC_URL = "https://studio.genlayer.com/api";
+const GENLAYER_SNAP_ID = "npm:genlayer-wallet-plugin";
+const GENLAYER_STUDIO_URL = "https://studio.genlayer.com/";
 
 declare global {
   interface Window {
@@ -292,6 +294,7 @@ export default function Home() {
   const [tradeStatus, setTradeStatus] = useState("");
   const [tradeBusy, setTradeBusy] = useState(false);
   const [liquidityBusy, setLiquidityBusy] = useState(false);
+  const [walletSnapReady, setWalletSnapReady] = useState<boolean | null>(null);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
   const [weatherStatus, setWeatherStatus] = useState<"idle" | "loading" | "live" | "error">("idle");
   const [aiQuestion, setAiQuestion] = useState("Explain the resolution risk for this market.");
@@ -492,13 +495,14 @@ export default function Home() {
     }
     setTradeBusy(true);
     setTradeStatus("Submitting GenLayer transaction...");
-    setTxSteps(["Wallet requested", "Switching StudioNet", "Signing GenLayer order"]);
+    setTxSteps(["Wallet requested", "Checking GenLayer Snap", "Signing GenLayer order"]);
     try {
       if (!walletAddress) {
         await connectWallet();
       }
       const account = walletAddress || (await requestPrimaryAccount());
       await ensureStudioNet();
+      await ensureGenLayerSnap();
       const outcomeIndex = Math.max(1, activeMarket.outcomes.findIndex((outcome) => outcome.name === tradeOutcome) + 1);
       const amountCents = Math.max(1, Math.round(amountNumber * 100));
       const txHash = await submitGenLayerTrade(account, activeMarket, outcomeIndex, amountCents, amountNumber);
@@ -538,7 +542,7 @@ export default function Home() {
       setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} with ${amount || "0"} GEN on StudioNet`, ...items].slice(0, 6));
     } catch (error) {
       const message = extractErrorMessage(error);
-      setTxSteps(["Wallet/transaction error", message, "Adjust amount or network"]);
+      setTxSteps(["Wallet/transaction error", message, isSnapError(message) ? "Use MetaMask with GenLayer Snap" : "Adjust amount or network"]);
       setTradeStatus(message);
       setFeed((items) => [`Trade error: ${message}`, ...items].slice(0, 6));
     } finally {
@@ -561,6 +565,7 @@ export default function Home() {
       try {
         const account = walletAddress || (await requestPrimaryAccount());
         await ensureStudioNet();
+        await ensureGenLayerSnap();
         const txHash = await submitGenLayerCreateMarket(account, nextMarket);
         onchainNote = ` and mirrored on GenLayer ${shortHash(txHash)}`;
         await refreshWalletState(account);
@@ -638,6 +643,7 @@ export default function Home() {
       }
       const account = walletAddress || (await requestPrimaryAccount());
       await ensureStudioNet();
+      await ensureGenLayerSnap();
       const amountCents = Math.max(1, Math.round(value * 100));
       const txHash = await submitGenLayerLiquidity(account, activeMarket, amountCents, value);
       updateMission("liquidity-100", value);
@@ -665,6 +671,7 @@ export default function Home() {
       if (!firstAccount) throw new Error("No wallet account returned");
       setWalletAddress(firstAccount);
       await ensureStudioNet();
+      checkGenLayerSnap().catch(() => null);
       await refreshWalletState(firstAccount);
       setFeed((items) => [`Wallet connected ${shortAddress(firstAccount)}`, ...items].slice(0, 6));
     } catch (error) {
@@ -711,6 +718,37 @@ export default function Home() {
       });
     }
     setWalletChain("GenLayer StudioNet");
+  }
+
+  async function checkGenLayerSnap() {
+    if (!window.ethereum) throw new Error("Wallet not found");
+    try {
+      const snaps = await window.ethereum.request({ method: "wallet_getSnaps" });
+      const installed = Object.values((snaps ?? {}) as Record<string, any>).some((snap: any) => snap?.id === GENLAYER_SNAP_ID);
+      setWalletSnapReady(installed);
+      return installed;
+    } catch {
+      setWalletSnapReady(false);
+      throw new Error("This wallet does not support MetaMask Snaps. Use MetaMask with Snaps support, then install the GenLayer Snap from GenLayer Studio.");
+    }
+  }
+
+  async function ensureGenLayerSnap() {
+    if (!window.ethereum) throw new Error("Wallet not found");
+    const installed = await checkGenLayerSnap();
+    if (installed) return;
+    try {
+      await window.ethereum.request({
+        method: "wallet_requestSnaps",
+        params: {
+          [GENLAYER_SNAP_ID]: {}
+        }
+      });
+      setWalletSnapReady(true);
+    } catch (error) {
+      setWalletSnapReady(false);
+      throw new Error(`GenLayer Snap is required to sign this StudioNet transaction. Open ${GENLAYER_STUDIO_URL} with MetaMask and install/approve the GenLayer Snap. ${extractErrorMessage(error)}`);
+    }
   }
 
   async function refreshWalletState(account: string) {
@@ -914,6 +952,11 @@ export default function Home() {
                   <button className="submit-trade pulse-action" onClick={submitTrade} disabled={tradeBusy}>
                     <ShoppingCart size={16} />{tradeBusy ? "Submitting..." : tradeSide === "buy" ? "Buy shares" : "Sell shares"}
                   </button>
+                  {walletSnapReady === false && (
+                    <a className="snap-help" href={GENLAYER_STUDIO_URL} target="_blank" rel="noreferrer">
+                      Open GenLayer Studio to enable the GenLayer Snap
+                    </a>
+                  )}
                   {tradeStatus && <span className="api-note">{tradeStatus}</span>}
                   <TxTimeline steps={txSteps} />
                 </div>
@@ -1199,8 +1242,21 @@ function extractErrorMessage(error: unknown) {
 function cleanErrorMessage(message: string) {
   const compact = message.replace(/\s+/g, " ").trim();
   if (!compact) return "Transaction failed";
+  try {
+    const parsed = JSON.parse(compact);
+    if (parsed?.message) return cleanErrorMessage(String(parsed.message));
+  } catch {
+    // Keep the original message when it is not JSON.
+  }
+  if (compact.includes("wallet_getSnaps") || compact.includes("wallet_requestSnaps")) {
+    return "This wallet does not support MetaMask Snaps or the GenLayer Snap is not enabled. Use MetaMask with Snaps support and approve the GenLayer Snap in GenLayer Studio.";
+  }
   if (compact.length <= 180) return compact;
   return `${compact.slice(0, 180)}...`;
+}
+
+function isSnapError(message: string) {
+  return message.toLowerCase().includes("snap") || message.includes("wallet_getSnaps") || message.includes("wallet_requestSnaps");
 }
 
 function AiPanel({
