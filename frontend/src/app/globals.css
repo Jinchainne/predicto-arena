@@ -426,6 +426,14 @@ p { color: var(--muted); }
   padding: 8px 4px;
   font-size: 12px;
 }
+.quick-row button.active {
+  border-color: rgba(239,60,255,.7);
+  background: rgba(239,60,255,.16);
+  color: var(--text);
+}
+.submit-trade:disabled, .liquidity-panel button:disabled {
+  filter: saturate(.8);
+}
 .quote-box {
   display: grid;
   grid-template-columns: 1fr auto;

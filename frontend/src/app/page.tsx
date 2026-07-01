@@ -259,6 +259,8 @@ export default function Home() {
   });
   const [creatingMarket, setCreatingMarket] = useState(false);
   const [tradeStatus, setTradeStatus] = useState("");
+  const [tradeBusy, setTradeBusy] = useState(false);
+  const [liquidityBusy, setLiquidityBusy] = useState(false);
   const [aiQuestion, setAiQuestion] = useState("Explain the resolution risk for this market.");
   const [aiAnswer, setAiAnswer] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -367,7 +369,69 @@ export default function Home() {
     setFeed((items) => [`Switched market board to ${view}`, ...items].slice(0, 6));
   }
 
+  function openTradeTicket() {
+    setActiveNav("Markets");
+    setDrawerTab("Trade");
+    setTradeStatus("Trade ticket ready. Choose side, size, and submit a GenLayer wallet transaction.");
+    setFeed((items) => [`Trade ticket opened for ${activeMarket.title}`, ...items].slice(0, 6));
+  }
+
+  function selectDrawerTab(tab: string) {
+    setDrawerTab(tab);
+    setFeed((items) => [`Opened ${tab} panel for ${activeMarket.title}`, ...items].slice(0, 6));
+  }
+
+  function selectOrderType(type: "market" | "limit") {
+    setOrderType(type);
+    setFeed((items) => [`${type === "market" ? "Market" : "Limit"} order selected`, ...items].slice(0, 6));
+  }
+
+  function selectTradeSide(side: "buy" | "sell") {
+    setTradeSide(side);
+    setTradeStatus(side === "sell" ? "Sell requires an existing position in this outcome." : "Buy will create/mirror this market on GenLayer if needed.");
+    setFeed((items) => [`${side === "buy" ? "Buy" : "Sell"} side selected`, ...items].slice(0, 6));
+  }
+
+  function setQuickAmount(value: string) {
+    setAmount(value);
+    setTradeStatus(`Order size set to ${value} GEN.`);
+  }
+
   async function submitTrade() {
+    if (tradeBusy) return;
+    const amountNumber = Number(amount || 0);
+    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+      setTradeStatus("Enter a positive GEN amount before submitting.");
+      setTxSteps(["Amount required", "Set order size", "Submit again"]);
+      return;
+    }
+    if (tradeSide === "sell") {
+      const hasPosition = positions.some((position) => position.marketTitle === activeMarket.title && position.outcome === tradeOutcome && position.side === "buy");
+      if (!hasPosition) {
+        setTradeStatus("No local buy position found for this outcome. Buy shares first, then sell.");
+        setTxSteps(["Sell blocked", "No matching position", "Buy this outcome first"]);
+        return;
+      }
+    }
+    if (orderType === "limit") {
+      const limit = Number(limitPrice || 0);
+      if (!Number.isFinite(limit) || limit <= 0 || limit >= 100) {
+        setTradeStatus("Limit price must be between 1c and 99c.");
+        setTxSteps(["Limit invalid", "Set a 1c-99c price", "Submit again"]);
+        return;
+      }
+      if (tradeSide === "buy" && selectedOutcome.price > limit) {
+        setTradeStatus(`Limit not met: current ${selectedOutcome.price}c is above your ${limit}c buy limit.`);
+        setTxSteps(["Limit checked", "Price too high", "Order not submitted"]);
+        return;
+      }
+      if (tradeSide === "sell" && selectedOutcome.price < limit) {
+        setTradeStatus(`Limit not met: current ${selectedOutcome.price}c is below your ${limit}c sell limit.`);
+        setTxSteps(["Limit checked", "Price too low", "Order not submitted"]);
+        return;
+      }
+    }
+    setTradeBusy(true);
     setTradeStatus("Submitting GenLayer transaction...");
     setTxSteps(["Wallet requested", "Switching StudioNet", "Signing GenLayer order"]);
     try {
@@ -377,7 +441,6 @@ export default function Home() {
       const account = walletAddress || (await requestPrimaryAccount());
       await ensureStudioNet();
       const outcomeIndex = Math.max(1, activeMarket.outcomes.findIndex((outcome) => outcome.name === tradeOutcome) + 1);
-      const amountNumber = Number(amount || 0);
       const amountCents = Math.max(1, Math.round(amountNumber * 100));
       const txHash = await submitGenLayerTrade(account, activeMarket, outcomeIndex, amountCents, amountNumber);
       setTxSteps(["Wallet confirmed", "GenLayer transaction sent", shortHash(txHash)]);
@@ -415,10 +478,12 @@ export default function Home() {
       setTradeStatus(`GenLayer tx ${shortHash(txHash)} / ticket ${result.ticketId}`);
       setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} with ${amount || "0"} GEN on StudioNet`, ...items].slice(0, 6));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Trade failed";
+      const message = extractErrorMessage(error);
       setTxSteps(["Wallet/transaction error", message, "Adjust amount or network"]);
       setTradeStatus(message);
       setFeed((items) => [`Trade error: ${message}`, ...items].slice(0, 6));
+    } finally {
+      setTradeBusy(false);
     }
   }
 
@@ -433,15 +498,25 @@ export default function Home() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Market API failed");
       const nextMarket = result.market as Market;
+      let onchainNote = "";
+      try {
+        const account = walletAddress || (await requestPrimaryAccount());
+        await ensureStudioNet();
+        const txHash = await submitGenLayerCreateMarket(account, nextMarket);
+        onchainNote = ` and mirrored on GenLayer ${shortHash(txHash)}`;
+        await refreshWalletState(account);
+      } catch (chainError) {
+        onchainNote = `, API saved; GenLayer mirror pending (${extractErrorMessage(chainError)})`;
+      }
       setMarketData((items) => [nextMarket, ...items]);
       setActiveMarketId(nextMarket.id);
       setTradeOutcome(nextMarket.outcomes[0]?.name ?? "");
       setActiveNav("Markets");
       setDrawerTab("Rules");
       updateMission("create-market", 1);
-      setFeed((items) => [`Created market via API: ${nextMarket.title}`, ...items].slice(0, 6));
+      setFeed((items) => [`Created market${onchainNote}: ${nextMarket.title}`, ...items].slice(0, 6));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Market creation failed";
+      const message = extractErrorMessage(error);
       setFeed((items) => [`Create market error: ${message}`, ...items].slice(0, 6));
     } finally {
       setCreatingMarket(false);
@@ -491,11 +566,13 @@ export default function Home() {
   }
 
   async function addLiquidity() {
+    if (liquidityBusy) return;
     const value = Number(liquidityAmount || 0);
     if (!Number.isFinite(value) || value <= 0) {
       setFeed((items) => ["Liquidity amount must be positive", ...items].slice(0, 6));
       return;
     }
+    setLiquidityBusy(true);
     try {
       if (!walletAddress) {
         await connectWallet();
@@ -508,8 +585,10 @@ export default function Home() {
       await refreshWalletState(account);
       setFeed((items) => [`Added ${value.toFixed(2)} GEN liquidity on GenLayer ${shortHash(txHash)}`, ...items].slice(0, 6));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Liquidity transaction failed";
+      const message = extractErrorMessage(error);
       setFeed((items) => [`Liquidity error: ${message}`, ...items].slice(0, 6));
+    } finally {
+      setLiquidityBusy(false);
     }
   }
 
@@ -630,6 +709,17 @@ export default function Home() {
     });
   }
 
+  async function submitGenLayerCreateMarket(account: string, market: Market) {
+    const client = createClient({ chain: studionet, account: account as `0x${string}` });
+    await client.connect("studionet");
+    return client.writeContract({
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      functionName: "create_market_with_external_id",
+      args: contractMarketArgs(market),
+      value: BigInt(0)
+    });
+  }
+
   return (
     <main className="terminal">
       <header className="topbar">
@@ -683,7 +773,7 @@ export default function Home() {
                   <h1>{activeMarket.title}</h1>
                   <p>{activeMarket.note}</p>
                 </div>
-                <button onClick={submitTrade}><Activity size={16} />Trade now</button>
+                <button onClick={openTradeTicket}><Activity size={16} />Trade now</button>
               </div>
               <div className="feature-grid">
                 <div className="outcome-stack">
@@ -732,7 +822,7 @@ export default function Home() {
             <div className="trade-drawer">
               <div className="drawer-tabs">
                 {["Trade", "Book", "Rules", "Oracle"].map((tab) => (
-                  <button key={tab} className={drawerTab === tab ? "active" : ""} onClick={() => setDrawerTab(tab)}>{tab}</button>
+                  <button key={tab} className={drawerTab === tab ? "active" : ""} onClick={() => selectDrawerTab(tab)}>{tab}</button>
                 ))}
               </div>
               {drawerTab === "Trade" && (
@@ -740,16 +830,18 @@ export default function Home() {
                   <h2>{selectedOutcome.name}</h2>
                   <p>{activeMarket.title}</p>
                   <div className="order-mode">
-                    <button className={orderType === "market" ? "active" : ""} onClick={() => setOrderType("market")}>Market</button>
-                    <button className={orderType === "limit" ? "active" : ""} onClick={() => setOrderType("limit")}>Limit</button>
+                    <button className={orderType === "market" ? "active" : ""} onClick={() => selectOrderType("market")}>Market</button>
+                    <button className={orderType === "limit" ? "active" : ""} onClick={() => selectOrderType("limit")}>Limit</button>
                   </div>
                   <div className="side-toggle">
-                    <button className={tradeSide === "buy" ? "active" : ""} onClick={() => setTradeSide("buy")}>Buy</button>
-                    <button className={tradeSide === "sell" ? "active" : ""} onClick={() => setTradeSide("sell")}>Sell</button>
+                    <button className={tradeSide === "buy" ? "active" : ""} onClick={() => selectTradeSide("buy")}>Buy</button>
+                    <button className={tradeSide === "sell" ? "active" : ""} onClick={() => selectTradeSide("sell")}>Sell</button>
                   </div>
                   <label>Amount<input value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
                   <div className="quick-row">
-                    {["10", "25", "50", "100"].map((value) => <button key={value} onClick={() => setAmount(value)}>{value} GEN</button>)}
+                    {["10", "25", "50", "100"].map((value) => (
+                      <button key={value} className={amount === value ? "active" : ""} onClick={() => setQuickAmount(value)}>{value} GEN</button>
+                    ))}
                   </div>
                   {orderType === "limit" && <label>Limit price<input value={limitPrice} onChange={(event) => setLimitPrice(event.target.value)} /></label>}
                   <label>Max slippage<input value={slippage} onChange={(event) => setSlippage(event.target.value)} /></label>
@@ -759,7 +851,9 @@ export default function Home() {
                     <span>Slippage cap</span><strong>{maxSlippageCost.toFixed(3)} GEN</strong>
                     <span>Max payout</span><strong>${(estimatedShares).toFixed(2)}</strong>
                   </div>
-                  <button className="submit-trade pulse-action" onClick={submitTrade}><ShoppingCart size={16} />{tradeSide === "buy" ? "Buy shares" : "Sell shares"}</button>
+                  <button className="submit-trade pulse-action" onClick={submitTrade} disabled={tradeBusy}>
+                    <ShoppingCart size={16} />{tradeBusy ? "Submitting..." : tradeSide === "buy" ? "Buy shares" : "Sell shares"}
+                  </button>
                   {tradeStatus && <span className="api-note">{tradeStatus}</span>}
                   <TxTimeline steps={txSteps} />
                 </div>
@@ -768,7 +862,7 @@ export default function Home() {
               {drawerTab === "Rules" && <Rules market={activeMarket} />}
               {drawerTab === "Oracle" && <Oracle market={activeMarket} />}
             </div>
-            <LiquidityPanel amount={liquidityAmount} onAmount={setLiquidityAmount} onAdd={addLiquidity} market={activeMarket} />
+            <LiquidityPanel amount={liquidityAmount} busy={liquidityBusy} onAmount={setLiquidityAmount} onAdd={addLiquidity} market={activeMarket} />
 
             <div className="side-feed">
               <h2>New markets</h2>
@@ -851,11 +945,13 @@ function TxTimeline({ steps }: { steps: string[] }) {
 
 function LiquidityPanel({
   amount,
+  busy,
   onAmount,
   onAdd,
   market
 }: {
   amount: string;
+  busy: boolean;
   onAmount: (value: string) => void;
   onAdd: () => void;
   market: Market;
@@ -874,7 +970,7 @@ function LiquidityPanel({
           </div>
         ))}
       </div>
-      <button onClick={onAdd}><Plus size={15} />Add liquidity</button>
+      <button onClick={onAdd} disabled={busy}><Plus size={15} />{busy ? "Adding..." : "Add liquidity"}</button>
     </div>
   );
 }
@@ -954,6 +1050,23 @@ function parseMoney(value: string) {
   const normalized = value.replace("$", "").replace(",", "").trim();
   const multiplier = normalized.endsWith("B") ? 1_000_000_000 : normalized.endsWith("M") ? 1_000_000 : normalized.endsWith("K") ? 1_000 : 1;
   return Number(normalized.replace(/[BMK]/g, "")) * multiplier || 0;
+}
+
+function extractErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return cleanErrorMessage(error.message);
+  if (typeof error === "string") return cleanErrorMessage(error);
+  try {
+    return cleanErrorMessage(JSON.stringify(error));
+  } catch {
+    return "Transaction failed";
+  }
+}
+
+function cleanErrorMessage(message: string) {
+  const compact = message.replace(/\s+/g, " ").trim();
+  if (!compact) return "Transaction failed";
+  if (compact.length <= 180) return compact;
+  return `${compact.slice(0, 180)}...`;
 }
 
 function AiPanel({
