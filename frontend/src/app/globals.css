@@ -28,7 +28,7 @@ button { cursor: pointer; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 svg { flex-shrink: 0; }
 
-.terminal { min-height: 100vh; padding-bottom: 34px; }
+.terminal { min-height: 100vh; padding-bottom: 58px; }
 .topbar {
   height: 64px;
   display: grid;
@@ -230,8 +230,8 @@ p { color: var(--muted); }
   gap: 18px;
   padding: 16px;
 }
-.feature-grid.has-context {
-  grid-template-columns: 280px minmax(360px, 1fr) 320px;
+.feature-grid.football-grid {
+  grid-template-columns: 280px minmax(0, 1fr);
   align-items: stretch;
 }
 .outcome-stack { display: grid; gap: 10px; }
@@ -276,48 +276,33 @@ p { color: var(--muted); }
 .chart-panel path { stroke: rgba(255,255,255,.08); fill: none; }
 .chart-panel .spark { stroke: var(--pink); stroke-width: 4; filter: drop-shadow(0 0 10px rgba(239,60,255,.8)); }
 .chart-meta { display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
-.live-context {
+.football-board {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 14px;
+  min-width: 0;
 }
-.video-card, .weather-card {
-  border: 1px solid var(--line);
+.football-hero {
+  min-height: 190px;
+  border: 1px solid rgba(74,222,128,.22);
   border-radius: 14px;
-  background: linear-gradient(145deg, rgba(255,255,255,.06), rgba(0,0,0,.18));
+  background-size: cover;
+  background-position: center;
+  padding: 20px;
+  display: grid;
+  align-content: end;
+  gap: 8px;
   overflow: hidden;
-}
-.video-card {
   position: relative;
 }
-.video-card::before {
+.football-hero::after {
   content: "";
   position: absolute;
-  inset: -40%;
-  background: conic-gradient(from 180deg, transparent, rgba(74,222,128,.16), transparent, rgba(239,60,255,.14), transparent);
-  animation: contextSpin 9s linear infinite;
-  pointer-events: none;
+  inset: 0;
+  background: linear-gradient(110deg, transparent, rgba(255,255,255,.12), transparent);
+  animation: shimmer 4s ease-in-out infinite;
 }
-.video-card iframe {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border: 0;
-  display: block;
-  background: #08050a;
-}
-.video-head {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  padding: 12px 14px;
-  background: rgba(8,5,10,.78);
-  backdrop-filter: blur(12px);
-}
-.video-head span, .weather-card span {
+.football-hero > * { position: relative; z-index: 1; }
+.football-hero span, .qualified-teams > div:first-child span, .football-events span, .weather-ticker span {
   color: var(--green);
   display: inline-flex;
   align-items: center;
@@ -326,41 +311,62 @@ p { color: var(--muted); }
   font-weight: 900;
   text-transform: uppercase;
 }
-.weather-card {
+.football-hero strong {
+  font-size: 30px;
+}
+.football-hero p { max-width: 560px; margin: 0; }
+.football-events {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.football-events article {
+  min-height: 170px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background-size: cover;
+  background-position: center;
   padding: 14px;
   display: grid;
-  gap: 12px;
-  align-content: start;
-  background:
-    radial-gradient(circle at 85% 15%, rgba(96,165,250,.18), transparent 32%),
-    linear-gradient(145deg, rgba(255,255,255,.06), rgba(0,0,0,.16));
+  align-content: end;
+  gap: 7px;
 }
-.weather-card > div:first-child {
+.football-events strong { font-size: 17px; }
+.football-events p { margin: 0; font-size: 13px; }
+.qualified-teams {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255,255,255,.04);
   display: grid;
-  gap: 5px;
+  gap: 12px;
 }
-.weather-card > div:first-child strong {
-  font-size: 20px;
+.qualified-teams > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
 }
-.weather-grid {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.team-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
-.weather-grid div {
+.team-strip button {
   border: 1px solid var(--line);
-  border-radius: 11px;
-  background: rgba(255,255,255,.045);
+  border-radius: 10px;
   padding: 10px;
+  color: var(--text);
+  background: rgba(255,255,255,.045);
+  display: grid;
+  gap: 3px;
+  text-align: left;
 }
-.weather-grid span {
+.team-strip button span { color: var(--gold); font-weight: 900; }
+.team-strip button em {
   color: var(--muted);
-  text-transform: none;
-}
-.weather-grid strong {
-  display: block;
-  margin-top: 5px;
-  font-size: 18px;
+  font-style: normal;
+  font-size: 12px;
 }
 
 .section-title {
@@ -806,7 +812,8 @@ p { color: var(--muted); }
   left: 0;
   right: 0;
   height: 34px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 22px;
   padding: 0 20px;
@@ -814,6 +821,7 @@ p { color: var(--muted); }
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 13px;
+  overflow: hidden;
 }
 .online-dot {
   width: 8px;
@@ -842,19 +850,47 @@ p { color: var(--muted); }
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+.weather-ticker {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: tickerMove 28s linear infinite;
+}
+.ticker-set {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding-right: 42px;
+}
+.ticker-set strong { color: var(--text); }
+.ticker-set em {
+  color: #cdbfe0;
+  font-style: normal;
+}
+
+@keyframes tickerMove {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
 
 @media (max-width: 1180px) {
   .topbar { grid-template-columns: 44px 1fr; height: auto; padding: 14px; }
   .main-nav, .search, .deposit, .wallet-pill, .wallet-address { grid-column: span 2; justify-self: stretch; max-width: none; }
-  .market-shell, .feature-grid, .feature-grid.has-context, .portfolio-view, .live-context { grid-template-columns: 1fr; }
+  .market-shell, .feature-grid, .feature-grid.football-grid, .portfolio-view { grid-template-columns: 1fr; }
   .category-hero { grid-template-columns: 1fr; }
   .market-grid, .tickets-view, .create-form, .outcome-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .football-events, .team-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
   .category-strip { padding: 0 12px; }
   .market-shell { padding: 0 12px; }
   .market-grid, .tickets-view, .create-form, .outcome-board { grid-template-columns: 1fr; }
+  .football-events, .team-strip { grid-template-columns: 1fr; }
   .volume-board button { grid-template-columns: 1fr; }
   .section-title { align-items: flex-start; flex-direction: column; gap: 10px; }
   .outcome { grid-template-columns: 1fr auto; }

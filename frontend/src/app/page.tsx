@@ -16,7 +16,6 @@ import {
   Globe2,
   Medal,
   Plus,
-  Play,
   CloudSun,
   Search,
   ShieldCheck,
@@ -123,17 +122,37 @@ const categoryImages: Record<string, string> = {
   All: "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?auto=format&fit=crop&w=1400&q=80"
 };
 
-const worldCupVideos = [
+const worldCupImages = [
   {
-    title: "FIFA World Cup 2026 Trailer - One Dream",
-    id: "91htvvcIurs",
-    source: "YouTube"
+    title: "Knockout night in North America",
+    image: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=85",
+    detail: "Round of 32 pressure, host-city weather, and crowd momentum."
   },
   {
-    title: "This is FIFA World Cup 26",
-    id: "ZTdOX1U2K0Q",
-    source: "FIFA YouTube"
+    title: "Golden Boot and star markets",
+    image: "https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=85",
+    detail: "Player form and matchups can move probabilities before kickoff."
+  },
+  {
+    title: "Host nation futures",
+    image: "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?auto=format&fit=crop&w=1200&q=85",
+    detail: "USA, Canada, and Mexico markets can use local conditions as context."
   }
+];
+
+const worldCupTeams = [
+  { name: "USA", flag: "US", group: "Host" },
+  { name: "Canada", flag: "CA", group: "Host" },
+  { name: "Mexico", flag: "MX", group: "Host" },
+  { name: "Argentina", flag: "AR", group: "CONMEBOL" },
+  { name: "Brazil", flag: "BR", group: "CONMEBOL" },
+  { name: "Japan", flag: "JP", group: "AFC" },
+  { name: "New Zealand", flag: "NZ", group: "OFC" },
+  { name: "IR Iran", flag: "IR", group: "AFC" },
+  { name: "South Korea", flag: "KR", group: "AFC" },
+  { name: "Uzbekistan", flag: "UZ", group: "AFC" },
+  { name: "Jordan", flag: "JO", group: "AFC" },
+  { name: "Ecuador", flag: "EC", group: "CONMEBOL" }
 ];
 
 const seedMarkets: Market[] = [
@@ -393,6 +412,7 @@ export default function Home() {
   const heroCategory = activeCategory === "All" ? activeMarket.category : activeCategory;
   const heroImage = categoryImages[heroCategory] ?? categoryImages.All;
   const contextLocation = inferWeatherLocation(activeMarket, tradeOutcome);
+  const activeIsFootball = isFootballMarket(activeMarket);
 
   useEffect(() => {
     let cancelled = false;
@@ -872,7 +892,7 @@ export default function Home() {
                 </div>
                 <button onClick={openTradeTicket}><Activity size={16} />Trade now</button>
               </div>
-              <div className="feature-grid has-context">
+              <div className={activeIsFootball ? "feature-grid football-grid" : "feature-grid"}>
                 <div className="outcome-stack">
                   {activeMarket.outcomes.map((outcome) => (
                     <button
@@ -886,16 +906,19 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
-                <div className="chart-panel tradingview-panel">
-                  <TradingViewChart market={activeMarket} />
-                  <div className="chart-meta">
-                    <span>Vol {activeMarket.volume}</span>
-                    <span>Liq {activeMarket.liquidity}</span>
-                    <span>Close {activeMarket.closes}</span>
-                    <span>{activeMarket.source ?? "Predicto"}</span>
+                {activeIsFootball ? (
+                  <FootballEventBoard market={activeMarket} selectedOutcome={tradeOutcome} />
+                ) : (
+                  <div className="chart-panel tradingview-panel">
+                    <TradingViewChart market={activeMarket} />
+                    <div className="chart-meta">
+                      <span>Vol {activeMarket.volume}</span>
+                      <span>Liq {activeMarket.liquidity}</span>
+                      <span>Close {activeMarket.closes}</span>
+                      <span>{activeMarket.source ?? "Predicto"}</span>
+                    </div>
                   </div>
-                </div>
-                <LiveContextPanel market={activeMarket} selectedOutcome={tradeOutcome} weather={weather} weatherStatus={weatherStatus} />
+                )}
               </div>
             </div>
 
@@ -1002,9 +1025,7 @@ export default function Home() {
 
       <footer className="status-bar">
         <span className="online-dot" /> Live session
-        <span>English</span>
-        <span>Docs</span>
-        <span>GenLayer oracle simulation</span>
+        <WeatherTicker weather={weather} weatherStatus={weatherStatus} location={contextLocation} market={activeMarket} />
       </footer>
     </main>
   );
@@ -1033,56 +1054,89 @@ function TradingViewChart({ market }: { market: Market }) {
   );
 }
 
-function LiveContextPanel({
+function FootballEventBoard({
   market,
-  selectedOutcome,
-  weather,
-  weatherStatus
+  selectedOutcome
 }: {
   market: Market;
   selectedOutcome: string;
-  weather: WeatherSnapshot | null;
-  weatherStatus: "idle" | "loading" | "live" | "error";
 }) {
-  const isWorldCup = market.category === "World Cup" || market.tag === "Football";
-  const video = worldCupVideos[market.id % worldCupVideos.length];
+  const headline = worldCupImages[market.id % worldCupImages.length];
+  const eventCards = worldCupImages.map((event, index) => ({
+    ...event,
+    label: index === 0 ? "Winner market" : index === 1 ? "Player props" : "Host edge"
+  }));
 
   return (
-    <div className={isWorldCup ? "live-context world-cup-context" : "live-context"}>
-      {isWorldCup && (
-        <div className="video-card">
-          <div className="video-head">
-            <span><Play size={15} />Football live context</span>
-            <strong>{video.title}</strong>
-          </div>
-          <iframe
-            title={video.title}
-            src={`https://www.youtube.com/embed/${video.id}?rel=0&modestbranding=1`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
-        </div>
-      )}
-      <div className="weather-card">
+    <div className="football-board">
+      <div className="football-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(13,5,17,.9), rgba(13,5,17,.35)), url(${headline.image})` }}>
+        <span><Trophy size={16} />FIFA World Cup 2026 market</span>
+        <strong>{selectedOutcome} pressure watch</strong>
+        <p>{headline.detail}</p>
+      </div>
+
+      <div className="football-events">
+        {eventCards.map((event) => (
+          <article key={event.title} style={{ backgroundImage: `linear-gradient(180deg, rgba(10,4,13,.2), rgba(10,4,13,.92)), url(${event.image})` }}>
+            <span>{event.label}</span>
+            <strong>{event.title}</strong>
+            <p>{event.detail}</p>
+          </article>
+        ))}
+      </div>
+
+      <div className="qualified-teams">
         <div>
-          <span><CloudSun size={15} />Weather context</span>
-          <strong>{weather?.location ?? inferWeatherLocation(market, selectedOutcome)}</strong>
+          <span>Verified participant board</span>
+          <strong>World Cup 2026 teams</strong>
         </div>
-        {weatherStatus === "loading" && <p>Loading live weather...</p>}
-        {weatherStatus === "error" && <p>Weather data unavailable for this market right now.</p>}
-        {weatherStatus === "live" && weather?.current && (
-          <div className="weather-grid">
-            <div><span>Temp</span><strong>{formatWeatherValue(weather.current.temperature_2m, weather.units?.temperature_2m)}</strong></div>
-            <div><span>Feels</span><strong>{formatWeatherValue(weather.current.apparent_temperature, weather.units?.apparent_temperature)}</strong></div>
-            <div><span>Wind</span><strong>{formatWeatherValue(weather.current.wind_speed_10m, weather.units?.wind_speed_10m)}</strong></div>
-            <div><span>Rain</span><strong>{formatWeatherValue(weather.current.precipitation, weather.units?.precipitation)}</strong></div>
+        <div className="team-strip">
+          {worldCupTeams.map((team) => (
+            <button key={team.name} type="button">
+              <span>{team.flag}</span>
+              <strong>{team.name}</strong>
+              <em>{team.group}</em>
+            </button>
+          ))}
+        </div>
+        <p>{market.source ?? "FIFA public evidence"} tracks participating teams, fixtures, and official result sources for GenLayer resolution.</p>
+      </div>
+    </div>
+  );
+}
+
+function WeatherTicker({
+  weather,
+  weatherStatus,
+  location,
+  market
+}: {
+  weather: WeatherSnapshot | null;
+  weatherStatus: "idle" | "loading" | "live" | "error";
+  location: string;
+  market: Market;
+}) {
+  const temp = formatWeatherValue(weather?.current?.temperature_2m, weather?.units?.temperature_2m);
+  const feels = formatWeatherValue(weather?.current?.apparent_temperature, weather?.units?.apparent_temperature);
+  const wind = formatWeatherValue(weather?.current?.wind_speed_10m, weather?.units?.wind_speed_10m);
+  const rain = formatWeatherValue(weather?.current?.precipitation, weather?.units?.precipitation);
+  const place = weather?.location ?? location;
+  const label = isFootballMarket(market) ? "Football weather" : "Market weather";
+
+  return (
+    <div className="weather-ticker">
+      <div className="ticker-track">
+        {[0, 1].map((copy) => (
+          <div className="ticker-set" key={copy}>
+            <span><CloudSun size={15} />{label}</span>
+            <strong>{weatherStatus === "loading" ? "Loading live weather" : place}</strong>
+            <em>Temp {temp}</em>
+            <em>Feels {feels}</em>
+            <em>Wind {wind}</em>
+            <em>Rain {rain}</em>
+            <em>{isFootballMarket(market) ? "Pitch and travel context for World Cup markets" : "Public context for oracle review"}</em>
           </div>
-        )}
-        <p>
-          {isWorldCup
-            ? `Outdoor football markets can be sensitive to host-city weather, travel, pitch speed, and humidity. Current context follows ${selectedOutcome}.`
-            : `Live external context for this market. GenLayer can use public web evidence when resolution rules require source review.`}
-        </p>
+        ))}
       </div>
     </div>
   );
@@ -1222,6 +1276,10 @@ function inferWeatherLocation(market: Market, outcome: string) {
   if (text.includes("solana")) return "San Francisco";
   if (text.includes("bnb")) return "Singapore";
   return "New York";
+}
+
+function isFootballMarket(market: Market) {
+  return market.category === "World Cup" || market.category === "Sports" || market.tag === "Football";
 }
 
 function formatWeatherValue(value: number | undefined, unit = "") {
