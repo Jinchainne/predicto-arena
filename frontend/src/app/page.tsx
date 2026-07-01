@@ -16,6 +16,8 @@ import {
   Globe2,
   Medal,
   Plus,
+  Play,
+  CloudSun,
   Search,
   ShieldCheck,
   ShoppingCart,
@@ -40,6 +42,22 @@ type Market = {
   note: string;
   source?: string;
   sourceUrl?: string;
+};
+
+type WeatherSnapshot = {
+  location: string;
+  timezone: string;
+  current?: {
+    temperature_2m?: number;
+    apparent_temperature?: number;
+    relative_humidity_2m?: number;
+    precipitation?: number;
+    wind_speed_10m?: number;
+    weather_code?: number;
+    time?: string;
+  };
+  units?: Record<string, string>;
+  source: string;
 };
 
 type CreateMarketState = {
@@ -102,6 +120,19 @@ const categoryImages: Record<string, string> = {
   New: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1400&q=80",
   All: "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?auto=format&fit=crop&w=1400&q=80"
 };
+
+const worldCupVideos = [
+  {
+    title: "FIFA World Cup 2026 Trailer - One Dream",
+    id: "91htvvcIurs",
+    source: "YouTube"
+  },
+  {
+    title: "This is FIFA World Cup 26",
+    id: "ZTdOX1U2K0Q",
+    source: "FIFA YouTube"
+  }
+];
 
 const seedMarkets: Market[] = [
   {
@@ -261,6 +292,8 @@ export default function Home() {
   const [tradeStatus, setTradeStatus] = useState("");
   const [tradeBusy, setTradeBusy] = useState(false);
   const [liquidityBusy, setLiquidityBusy] = useState(false);
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
+  const [weatherStatus, setWeatherStatus] = useState<"idle" | "loading" | "live" | "error">("idle");
   const [aiQuestion, setAiQuestion] = useState("Explain the resolution risk for this market.");
   const [aiAnswer, setAiAnswer] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -356,6 +389,32 @@ export default function Home() {
   const maxSlippageCost = (Number(amount || 0) * Number(slippage || 0)) / 100;
   const heroCategory = activeCategory === "All" ? activeMarket.category : activeCategory;
   const heroImage = categoryImages[heroCategory] ?? categoryImages.All;
+  const contextLocation = inferWeatherLocation(activeMarket, tradeOutcome);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadWeather() {
+      setWeatherStatus("loading");
+      try {
+        const response = await fetch(`/api/weather?location=${encodeURIComponent(contextLocation)}`, { cache: "no-store" });
+        if (!response.ok) throw new Error("Weather API failed");
+        const payload = await response.json();
+        if (!cancelled) {
+          setWeather(payload);
+          setWeatherStatus("live");
+        }
+      } catch {
+        if (!cancelled) {
+          setWeather(null);
+          setWeatherStatus("error");
+        }
+      }
+    }
+    loadWeather();
+    return () => {
+      cancelled = true;
+    };
+  }, [contextLocation]);
 
   function selectMarket(market: Market) {
     setActiveMarketId(market.id);
@@ -798,6 +857,7 @@ export default function Home() {
                     <span>{activeMarket.source ?? "Predicto"}</span>
                   </div>
                 </div>
+                <LiveContextPanel market={activeMarket} selectedOutcome={tradeOutcome} weather={weather} weatherStatus={weatherStatus} />
               </div>
             </div>
 
@@ -930,6 +990,61 @@ function TradingViewChart({ market }: { market: Market }) {
   );
 }
 
+function LiveContextPanel({
+  market,
+  selectedOutcome,
+  weather,
+  weatherStatus
+}: {
+  market: Market;
+  selectedOutcome: string;
+  weather: WeatherSnapshot | null;
+  weatherStatus: "idle" | "loading" | "live" | "error";
+}) {
+  const isWorldCup = market.category === "World Cup" || market.tag === "Football";
+  const video = worldCupVideos[market.id % worldCupVideos.length];
+
+  return (
+    <div className={isWorldCup ? "live-context world-cup-context" : "live-context"}>
+      {isWorldCup && (
+        <div className="video-card">
+          <div className="video-head">
+            <span><Play size={15} />Football live context</span>
+            <strong>{video.title}</strong>
+          </div>
+          <iframe
+            title={video.title}
+            src={`https://www.youtube.com/embed/${video.id}?rel=0&modestbranding=1`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+      )}
+      <div className="weather-card">
+        <div>
+          <span><CloudSun size={15} />Weather context</span>
+          <strong>{weather?.location ?? inferWeatherLocation(market, selectedOutcome)}</strong>
+        </div>
+        {weatherStatus === "loading" && <p>Loading live weather...</p>}
+        {weatherStatus === "error" && <p>Weather data unavailable for this market right now.</p>}
+        {weatherStatus === "live" && weather?.current && (
+          <div className="weather-grid">
+            <div><span>Temp</span><strong>{formatWeatherValue(weather.current.temperature_2m, weather.units?.temperature_2m)}</strong></div>
+            <div><span>Feels</span><strong>{formatWeatherValue(weather.current.apparent_temperature, weather.units?.apparent_temperature)}</strong></div>
+            <div><span>Wind</span><strong>{formatWeatherValue(weather.current.wind_speed_10m, weather.units?.wind_speed_10m)}</strong></div>
+            <div><span>Rain</span><strong>{formatWeatherValue(weather.current.precipitation, weather.units?.precipitation)}</strong></div>
+          </div>
+        )}
+        <p>
+          {isWorldCup
+            ? `Outdoor football markets can be sensitive to host-city weather, travel, pitch speed, and humidity. Current context follows ${selectedOutcome}.`
+            : `Live external context for this market. GenLayer can use public web evidence when resolution rules require source review.`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function TxTimeline({ steps }: { steps: string[] }) {
   return (
     <div className="tx-timeline">
@@ -1050,6 +1165,25 @@ function parseMoney(value: string) {
   const normalized = value.replace("$", "").replace(",", "").trim();
   const multiplier = normalized.endsWith("B") ? 1_000_000_000 : normalized.endsWith("M") ? 1_000_000 : normalized.endsWith("K") ? 1_000 : 1;
   return Number(normalized.replace(/[BMK]/g, "")) * multiplier || 0;
+}
+
+function inferWeatherLocation(market: Market, outcome: string) {
+  const text = `${outcome} ${market.title} ${market.category}`.toLowerCase();
+  if (text.includes("france")) return "France";
+  if (text.includes("argentina")) return "Argentina";
+  if (text.includes("brazil")) return "Brazil";
+  if (text.includes("england")) return "England";
+  if (text.includes("usa") || text.includes("united states")) return "United States";
+  if (text.includes("canada")) return "Canada";
+  if (text.includes("mexico")) return "Mexico";
+  if (text.includes("solana")) return "San Francisco";
+  if (text.includes("bnb")) return "Singapore";
+  return "New York";
+}
+
+function formatWeatherValue(value: number | undefined, unit = "") {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
+  return `${Math.round(value * 10) / 10}${unit}`;
 }
 
 function extractErrorMessage(error: unknown) {

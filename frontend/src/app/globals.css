@@ -272,6 +272,96 @@ p { color: var(--muted); }
 .chart-panel path { stroke: rgba(255,255,255,.08); fill: none; }
 .chart-panel .spark { stroke: var(--pink); stroke-width: 4; filter: drop-shadow(0 0 10px rgba(239,60,255,.8)); }
 .chart-meta { display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+.live-context {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
+  gap: 16px;
+}
+.live-context:not(.world-cup-context) {
+  grid-template-columns: 1fr;
+}
+.video-card, .weather-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255,255,255,.06), rgba(0,0,0,.18));
+  overflow: hidden;
+}
+.video-card {
+  position: relative;
+}
+.video-card::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: conic-gradient(from 180deg, transparent, rgba(74,222,128,.16), transparent, rgba(239,60,255,.14), transparent);
+  animation: contextSpin 9s linear infinite;
+  pointer-events: none;
+}
+.video-card iframe {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  display: block;
+  background: #08050a;
+}
+.video-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  background: rgba(8,5,10,.78);
+  backdrop-filter: blur(12px);
+}
+.video-head span, .weather-card span {
+  color: var(--green);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.weather-card {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(96,165,250,.18), transparent 32%),
+    linear-gradient(145deg, rgba(255,255,255,.06), rgba(0,0,0,.16));
+}
+.weather-card > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+.weather-card > div:first-child strong {
+  font-size: 20px;
+}
+.weather-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.weather-grid div {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255,255,255,.045);
+  padding: 10px;
+}
+.weather-grid span {
+  color: var(--muted);
+  text-transform: none;
+}
+.weather-grid strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 18px;
+}
 
 .section-title {
   display: flex;
@@ -736,10 +826,15 @@ p { color: var(--muted); }
   50% { color: #ffe2ff; text-shadow: 0 0 16px rgba(239,60,255,.5); }
 }
 
+@keyframes contextSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 @media (max-width: 1180px) {
   .topbar { grid-template-columns: 44px 1fr; height: auto; padding: 14px; }
   .main-nav, .search, .deposit, .wallet-pill, .wallet-address { grid-column: span 2; justify-self: stretch; max-width: none; }
-  .market-shell, .feature-grid, .portfolio-view { grid-template-columns: 1fr; }
+  .market-shell, .feature-grid, .portfolio-view, .live-context { grid-template-columns: 1fr; }
   .category-hero { grid-template-columns: 1fr; }
   .market-grid, .tickets-view, .create-form, .outcome-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
