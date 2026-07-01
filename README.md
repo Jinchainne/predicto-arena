@@ -24,6 +24,7 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 - Live market data API at `/api/markets` using Binance/Binance.US public REST, CoinGecko public REST, and GenLayer studionet metadata.
 - Category-specific markets and imagery, including a football visual treatment for World Cup markets.
 - Wallet trade flow that switches/adds GenLayer StudioNet and submits `buy_position` through `genlayer-js` with native `GEN` value.
+- DEX-style ticket with market/limit orders, slippage control, quick sizes, transaction timeline, liquidity panel, enhanced order book, depth bars, and recent fills.
 - Market creation API through `POST /api/markets`.
 - Trade ticket API through `POST /api/trades`.
 - EVM wallet connection through `window.ethereum` for MetaMask-compatible wallets.

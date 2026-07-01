@@ -385,14 +385,14 @@ p { color: var(--muted); }
   border-bottom: 1px solid var(--line);
 }
 .ticket, .book, .rules, .oracle { padding: 16px; display: grid; gap: 14px; }
-.side-toggle {
+.side-toggle, .order-mode {
   display: grid;
   grid-template-columns: 1fr 1fr;
   background: rgba(255,255,255,.06);
   border-radius: 12px;
   padding: 4px;
 }
-.side-toggle button {
+.side-toggle button, .order-mode button {
   border: 0;
   border-radius: 10px;
   padding: 10px;
@@ -400,17 +400,31 @@ p { color: var(--muted); }
   background: transparent;
   font-weight: 900;
 }
-.side-toggle button.active { background: var(--pink); color: white; }
+.side-toggle button.active, .order-mode button.active { background: var(--pink); color: white; }
 .ticket label {
   display: grid;
   gap: 6px;
   color: var(--muted);
 }
-.ticket label input {
+.ticket label input, .liquidity-panel input {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px;
   background: rgba(255,255,255,.05);
+  color: var(--text);
+}
+.quick-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.quick-row button {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255,255,255,.04);
+  color: var(--muted);
+  padding: 8px 4px;
+  font-size: 12px;
 }
 .quote-box {
   display: grid;
@@ -420,6 +434,35 @@ p { color: var(--muted); }
   padding: 12px;
 }
 .quote-box strong { color: var(--text); }
+.tx-timeline {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255,255,255,.035);
+}
+.tx-timeline div {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.tx-timeline span {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(239,60,255,.16);
+  color: var(--text);
+}
+.tx-timeline .current span {
+  background: var(--green);
+  color: #06130a;
+}
 .side-feed { padding: 16px; display: grid; gap: 12px; }
 .side-feed button {
   text-align: left;
@@ -430,7 +473,7 @@ p { color: var(--muted); }
   background: rgba(255,255,255,.05);
 }
 .side-feed span { display: block; color: var(--muted); margin-top: 8px; }
-.ai-panel, .genlayer-panel {
+.ai-panel, .genlayer-panel, .liquidity-panel {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #120915;
@@ -438,6 +481,87 @@ p { color: var(--muted); }
   display: grid;
   gap: 12px;
 }
+.liquidity-panel label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+}
+.liquidity-panel button {
+  border: 0;
+  border-radius: 10px;
+  background: rgba(74,222,128,.16);
+  color: #8cffae;
+  padding: 10px 12px;
+  font-weight: 900;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+}
+.pool-bars {
+  display: grid;
+  gap: 10px;
+}
+.pool-bars div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  position: relative;
+  padding-bottom: 10px;
+}
+.pool-bars em {
+  position: absolute;
+  left: 0;
+  right: auto;
+  bottom: 0;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--pink), var(--green));
+}
+.book-head, .book-row.enhanced, .fills div {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 10px;
+  align-items: center;
+}
+.book-head {
+  color: var(--muted);
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.book-row.enhanced {
+  color: var(--muted);
+  position: relative;
+  padding: 7px 0;
+}
+.book-row.enhanced strong { color: var(--text); }
+.book-row.enhanced em {
+  min-width: 86px;
+  position: relative;
+  color: var(--muted);
+  font-style: normal;
+  text-align: right;
+}
+.book-row.enhanced em i {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  height: 18px;
+  transform: translateY(-50%);
+  background: rgba(74,222,128,.13);
+  border-radius: 4px;
+  z-index: -1;
+}
+.fills {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+.fills h3 { font-size: 14px; }
+.fills div { color: var(--muted); font-size: 13px; }
+.fills strong { color: var(--text); }
 .genlayer-panel div {
   display: flex;
   justify-content: space-between;

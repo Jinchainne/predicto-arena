@@ -236,7 +236,12 @@ export default function Home() {
   const [activeMarketId, setActiveMarketId] = useState(seedMarkets[0].id);
   const [tradeOutcome, setTradeOutcome] = useState(seedMarkets[0].outcomes[0].name);
   const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
+  const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [amount, setAmount] = useState("25");
+  const [limitPrice, setLimitPrice] = useState("50");
+  const [slippage, setSlippage] = useState("1.0");
+  const [liquidityAmount, setLiquidityAmount] = useState("100");
+  const [txSteps, setTxSteps] = useState<string[]>(["Connect wallet", "Switch StudioNet", "Submit order"]);
   const [drawerTab, setDrawerTab] = useState("Trade");
   const [marketView, setMarketView] = useState<"Markets" | "Outcomes" | "Volume">("Markets");
   const [search, setSearch] = useState("");
@@ -344,7 +349,9 @@ export default function Home() {
 
   const activeMarket = marketData.find((market) => market.id === activeMarketId) ?? marketData[0] ?? seedMarkets[0];
   const selectedOutcome = activeMarket.outcomes.find((outcome) => outcome.name === tradeOutcome) ?? activeMarket.outcomes[0];
-  const estimatedShares = Number(amount || 0) / Math.max(1, selectedOutcome.price / 100);
+  const executionPrice = orderType === "limit" ? Number(limitPrice || selectedOutcome.price) : selectedOutcome.price;
+  const estimatedShares = Number(amount || 0) / Math.max(0.01, executionPrice / 100);
+  const maxSlippageCost = (Number(amount || 0) * Number(slippage || 0)) / 100;
   const heroCategory = activeCategory === "All" ? activeMarket.category : activeCategory;
   const heroImage = categoryImages[heroCategory] ?? categoryImages.All;
 
@@ -362,6 +369,7 @@ export default function Home() {
 
   async function submitTrade() {
     setTradeStatus("Submitting GenLayer transaction...");
+    setTxSteps(["Wallet requested", "Switching StudioNet", "Signing GenLayer order"]);
     try {
       if (!walletAddress) {
         await connectWallet();
@@ -372,6 +380,7 @@ export default function Home() {
       const amountNumber = Number(amount || 0);
       const amountCents = Math.max(1, Math.round(amountNumber * 100));
       const txHash = await submitGenLayerTrade(account, activeMarket.id, outcomeIndex, amountCents, amountNumber);
+      setTxSteps(["Wallet confirmed", "GenLayer transaction sent", shortHash(txHash)]);
 
       const response = await fetch("/api/trades", {
         method: "POST",
@@ -407,6 +416,7 @@ export default function Home() {
       setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} with ${amount || "0"} GEN on StudioNet`, ...items].slice(0, 6));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Trade failed";
+      setTxSteps(["Wallet/transaction error", message, "Adjust amount or network"]);
       setTradeStatus(message);
       setFeed((items) => [`Trade error: ${message}`, ...items].slice(0, 6));
     }
@@ -478,6 +488,16 @@ export default function Home() {
         return { ...mission, claimed: true };
       })
     );
+  }
+
+  function addLiquidity() {
+    const value = Number(liquidityAmount || 0);
+    if (!Number.isFinite(value) || value <= 0) {
+      setFeed((items) => ["Liquidity amount must be positive", ...items].slice(0, 6));
+      return;
+    }
+    updateMission("liquidity-100", value);
+    setFeed((items) => [`Added ${value.toFixed(2)} GEN simulated liquidity to ${activeMarket.title}`, ...items].slice(0, 6));
   }
 
   async function connectWallet() {
@@ -674,24 +694,36 @@ export default function Home() {
                 <div className="ticket">
                   <h2>{selectedOutcome.name}</h2>
                   <p>{activeMarket.title}</p>
+                  <div className="order-mode">
+                    <button className={orderType === "market" ? "active" : ""} onClick={() => setOrderType("market")}>Market</button>
+                    <button className={orderType === "limit" ? "active" : ""} onClick={() => setOrderType("limit")}>Limit</button>
+                  </div>
                   <div className="side-toggle">
                     <button className={tradeSide === "buy" ? "active" : ""} onClick={() => setTradeSide("buy")}>Buy</button>
                     <button className={tradeSide === "sell" ? "active" : ""} onClick={() => setTradeSide("sell")}>Sell</button>
                   </div>
                   <label>Amount<input value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+                  <div className="quick-row">
+                    {["10", "25", "50", "100"].map((value) => <button key={value} onClick={() => setAmount(value)}>{value} GEN</button>)}
+                  </div>
+                  {orderType === "limit" && <label>Limit price<input value={limitPrice} onChange={(event) => setLimitPrice(event.target.value)} /></label>}
+                  <label>Max slippage<input value={slippage} onChange={(event) => setSlippage(event.target.value)} /></label>
                   <div className="quote-box">
-                    <span>Price</span><strong>{selectedOutcome.price}c</strong>
+                    <span>Execution</span><strong>{executionPrice}c</strong>
                     <span>Est. shares</span><strong>{estimatedShares.toFixed(2)}</strong>
+                    <span>Slippage cap</span><strong>{maxSlippageCost.toFixed(3)} GEN</strong>
                     <span>Max payout</span><strong>${(estimatedShares).toFixed(2)}</strong>
                   </div>
                   <button className="submit-trade pulse-action" onClick={submitTrade}><ShoppingCart size={16} />{tradeSide === "buy" ? "Buy shares" : "Sell shares"}</button>
                   {tradeStatus && <span className="api-note">{tradeStatus}</span>}
+                  <TxTimeline steps={txSteps} />
                 </div>
               )}
               {drawerTab === "Book" && <OrderBook market={activeMarket} />}
               {drawerTab === "Rules" && <Rules market={activeMarket} />}
               {drawerTab === "Oracle" && <Oracle market={activeMarket} />}
             </div>
+            <LiquidityPanel amount={liquidityAmount} onAmount={setLiquidityAmount} onAdd={addLiquidity} market={activeMarket} />
 
             <div className="side-feed">
               <h2>New markets</h2>
@@ -756,6 +788,49 @@ function TradingViewChart({ market }: { market: Market }) {
       src={src}
       allowFullScreen
     />
+  );
+}
+
+function TxTimeline({ steps }: { steps: string[] }) {
+  return (
+    <div className="tx-timeline">
+      {steps.map((step, index) => (
+        <div key={`${step}-${index}`} className={index === steps.length - 1 ? "current" : ""}>
+          <span>{index + 1}</span>
+          <strong>{step}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LiquidityPanel({
+  amount,
+  onAmount,
+  onAdd,
+  market
+}: {
+  amount: string;
+  onAmount: (value: string) => void;
+  onAdd: () => void;
+  market: Market;
+}) {
+  return (
+    <div className="liquidity-panel">
+      <h2><Coins size={18} />Liquidity</h2>
+      <p>{market.liquidity} active depth</p>
+      <label>GEN amount<input value={amount} onChange={(event) => onAmount(event.target.value)} /></label>
+      <div className="pool-bars">
+        {market.outcomes.slice(0, 4).map((outcome) => (
+          <div key={outcome.name}>
+            <span>{outcome.name}</span>
+            <strong>{outcome.price}%</strong>
+            <em style={{ width: `${outcome.price}%` }} />
+          </div>
+        ))}
+      </div>
+      <button onClick={onAdd}><Plus size={15} />Add liquidity</button>
+    </div>
   );
 }
 
@@ -939,16 +1014,42 @@ function formatGEN(value: bigint) {
 }
 
 function OrderBook({ market }: { market: Market }) {
+  const asks = market.outcomes.map((outcome, index) => ({
+    name: outcome.name,
+    price: Math.min(99, outcome.price + index + 2),
+    size: 1200 - index * 180
+  }));
+  const bids = market.outcomes.map((outcome, index) => ({
+    name: outcome.name,
+    price: Math.max(1, outcome.price - index - 2),
+    size: 950 - index * 130
+  }));
+
   return (
     <div className="book">
-      <h2>Order book</h2>
+      <h2><BarChart3 size={18} />Order book</h2>
+      <div className="book-head"><span>Outcome</span><span>Bid</span><span>Ask</span><span>Depth</span></div>
       {market.outcomes.map((outcome, index) => (
-        <div key={outcome.name} className="book-row">
+        <div key={outcome.name} className="book-row enhanced">
           <span>{outcome.name}</span>
-          <strong>{outcome.price + index}c</strong>
-          <em>${(1200 - index * 180).toLocaleString()}</em>
+          <strong>{bids[index].price}c</strong>
+          <strong>{asks[index].price}c</strong>
+          <em>
+            <i style={{ width: `${Math.min(100, asks[index].size / 12)}%` }} />
+            ${(asks[index].size + bids[index].size).toLocaleString()}
+          </em>
         </div>
       ))}
+      <div className="fills">
+        <h3>Recent fills</h3>
+        {market.outcomes.slice(0, 4).map((outcome, index) => (
+          <div key={`${outcome.name}-fill`}>
+            <span>{index % 2 ? "Sell" : "Buy"} {outcome.name}</span>
+            <strong>{outcome.price}c</strong>
+            <em>{(12 + index * 7).toFixed(2)} GEN</em>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
