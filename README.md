@@ -14,8 +14,10 @@ The product is designed as a Builder -> Projects submission: a market terminal w
 ## Core Experience
 
 - Multi-layer market navigation with top-level sections and category filters.
-- Featured market board with outcome prices and probability chart.
+- Featured market board with outcome prices and context-aware market detail surfaces.
 - Full TradingView embedded chart for BTC/ETH/BNB/SOL-style crypto market symbols.
+- Football-specific World Cup 2026 board with event imagery, verified participant/team cards, and no irrelevant trading chart.
+- Bottom weather ticker with live Open-Meteo context for the currently selected market/team.
 - Animated marketplace-style UX with icon menus, live ticker strip, hover motion, and action feedback.
 - Market cards that open a detailed trade drawer.
 - Trade ticket with buy/sell side, amount, estimated shares, and payout.
@@ -40,6 +42,15 @@ Prediction markets need transparent resolution. Predicto Arena is built around a
 The deployed GenLayer contract supports market creation, external market mapping, AMM-style buying and selling, liquidity provision, quote reads, public-source resolution, and claim accounting for resolved winning positions.
 
 TradingView is embedded as the live chart surface. Price/market APIs come from Binance/Binance.US and CoinGecko public APIs, while the GenLayer contract anchors the prediction market factory, trading, liquidity, and resolution layer.
+
+## Builder Submission Fit
+
+- **Contribution type:** Builder -> Projects.
+- **GenLayer is central:** the product is not only a frontend; the deployed Intelligent Contract is the market factory, trading state, liquidity state, quote surface, resolution flow, and claim accounting layer.
+- **Evidence-based resolution:** `resolve_market` uses GenLayer web access and AI validator consensus to inspect public source URLs and choose the winning outcome from natural-language rules.
+- **Useful project scope:** the app demonstrates an end-to-end prediction market workflow: discover markets, mirror live API markets on-chain, trade with a wallet, provide liquidity, inspect rules/oracle evidence, and resolve/claim.
+- **Why GenLayer:** prediction markets often depend on ambiguous, external, or subjective evidence. This is a strong fit for Intelligent Contracts because validators can fetch web data, interpret rules, and reach consensus on real-world outcomes.
+- **Evidence links:** live Vercel app, GitHub repo, StudioNet contract address, and documented deployment/test scripts.
 
 ## Run Locally
 
