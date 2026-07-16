@@ -1279,8 +1279,7 @@ export default function Home() {
     const marketIdResult = await readClient.readContract({
       address: currentContractAddress(),
       functionName: "get_market_id_by_external_id",
-      args: [externalId],
-      stateStatus: "accepted"
+      args: [externalId]
     });
     const onchainMarketId = parseContractInt(marketIdResult);
     if (!onchainMarketId) {
@@ -1305,8 +1304,7 @@ export default function Home() {
     const marketResult = await readClient.readContract({
       address: currentContractAddress(),
       functionName: "get_market",
-      args: [onchainMarketId],
-      stateStatus: "accepted"
+      args: [onchainMarketId]
     }) as Record<string, unknown>;
 
     const outcomes = isFootballMarket(market) ? buildWorldCupOutcomes(market) : market.outcomes;
@@ -1315,8 +1313,7 @@ export default function Home() {
         const outcomeResult = await readClient.readContract({
           address: currentContractAddress(),
           functionName: "get_outcome",
-          args: [onchainMarketId, index + 1],
-          stateStatus: "accepted"
+          args: [onchainMarketId, index + 1]
         }) as Record<string, unknown>;
 
         let userPosition = 0;
@@ -1324,8 +1321,7 @@ export default function Home() {
           const positionResult = await readClient.readContract({
             address: currentContractAddress(),
             functionName: "get_position",
-            args: [onchainMarketId, index + 1, account],
-            stateStatus: "accepted"
+            args: [onchainMarketId, index + 1, account]
           });
           userPosition = parseContractInt(positionResult);
         }
@@ -1343,8 +1339,7 @@ export default function Home() {
       ? await readClient.readContract({
           address: currentContractAddress(),
           functionName: "get_liquidity_position",
-          args: [onchainMarketId, account],
-          stateStatus: "accepted"
+          args: [onchainMarketId, account]
         })
       : 0;
 
