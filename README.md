@@ -1,6 +1,6 @@
 # Predicto Arena
 
-**Predicto Arena** is a GenLayer-powered prediction market terminal for real-world events, live crypto markets, and evidence-based oracle resolution. It combines a modern DEX-style trading interface with a deployed GenLayer Intelligent Contract that handles market creation, trading state, liquidity, quotes, resolution, and winning-claim accounting.
+**Predicto Arena** is a GenLayer-powered prediction market terminal for real-world events, live crypto markets, and evidence-based oracle resolution. It combines a modern DEX-style trading interface with a deployed GenLayer Intelligent Contract that handles market creation, payable funding, custodial trading state, real settlement transfers, evidence-aware resolution, and winning claims.
 
 This project is designed for **GenLayer Builders -> Projects**: a complete application where GenLayer is the protocol layer, not a cosmetic integration.
 
@@ -20,12 +20,11 @@ Prediction markets depend on trustworthy answers to real-world questions. Many o
 Predicto Arena uses GenLayer where it matters most:
 
 - **Intelligent Contract market factory**: live API markets can be mirrored on-chain by external market id.
-- **On-chain trading state**: buy, sell, liquidity, volume, fee, position, and quote data are tracked by the contract.
+- **On-chain funding and settlement**: buy and liquidity actions are payable, custody GEN in the contract, and sell/claim actions emit real settlement transfers back to wallets.
 - **Protocol lifecycle controls**: markets support open, paused, resolving, resolved, and canceled states.
-- **Evidence and dispute rails**: users can append public evidence and open post-resolution disputes.
-- **Evidence-based resolution**: `resolve_market` uses GenLayer web access and AI validator consensus to inspect public source URLs and select the winning outcome.
-- **Claim accounting**: resolved winning positions can be claimed through contract state.
-- **Wallet path**: the frontend connects to GenLayer StudioNet through `genlayer-js` and the GenLayer MetaMask Snap flow.
+- **Evidence and dispute rails**: users can append public evidence and open post-resolution disputes, and both are pulled into the resolution prompt.
+- **Evidence-based resolution**: `resolve_market` uses GenLayer web access and AI validator consensus to inspect public source URLs and validate the proposed outcome against submitted evidence.
+- **Wallet path**: the frontend connects to GenLayer StudioNet through `genlayer-js`, performs direct contract reads, and signs writes through the GenLayer MetaMask Snap flow.
 
 The frontend is the exchange terminal; the GenLayer Intelligent Contract is the protocol and oracle layer.
 
@@ -64,7 +63,7 @@ The deployed Intelligent Contract includes:
 | `add_evidence` | Appends a public source URL and note to a market evidence log. |
 | `open_dispute` | Opens a post-resolution dispute with a reason note. |
 | `pause_market` / `resume_market` / `cancel_market` | Adds lifecycle controls for safer market operations. |
-| `claim_winnings` | Accounts for payout claims after resolution. |
+| `claim_winnings` | Transfers real GEN payouts for winning positions after resolution. |
 
 ## Architecture
 
@@ -84,11 +83,11 @@ genlayer-js
    v
 GenLayer StudioNet Intelligent Contract
    - market factory
-   - trading state
-   - liquidity state
+   - payable trading state
+   - custodial liquidity state
    - quote views
-   - oracle resolution
-   - claim accounting
+   - evidence/dispute-aware oracle resolution
+   - settlement transfers
 ```
 
 ## Application Routes
@@ -97,7 +96,6 @@ GenLayer StudioNet Intelligent Contract
 | --- | --- |
 | `/` | Main prediction market terminal. |
 | `/api/markets` | Live and thematic market feed. |
-| `/api/trades` | Local trade ticket/session record endpoint. |
 | `/api/ask` | AI market analyst and oracle-risk explanation. |
 | `/api/weather` | Open-Meteo weather context for selected market/team. |
 
@@ -191,7 +189,7 @@ Title: Predicto Arena - GenLayer Prediction Market Terminal
 Suggested short description:
 
 ```text
-Predicto Arena is a complete GenLayer prediction market terminal. A deployed StudioNet Intelligent Contract powers market creation, external market mapping, AMM-style buy/sell/liquidity state, quote reads, public-source oracle resolution, and winning-claim accounting. The frontend adds live market APIs, wallet-signed GenLayer transactions, rules/oracle panels, AI market analysis, World Cup 2026 event boards, and weather context.
+Predicto Arena is a complete GenLayer prediction market terminal. A deployed StudioNet Intelligent Contract powers market creation, payable buy/liquidity funding, real GEN settlement transfers for sells and claims, quote reads, and public-source resolution that includes submitted evidence and disputes. The frontend adds direct contract reads, wallet-signed GenLayer transactions, live market APIs, rules/oracle panels, AI market analysis, World Cup 2026 event boards, and weather context.
 ```
 
 Suggested evidence:
@@ -210,7 +208,6 @@ contracts/
 frontend/
   src/app/                 Next.js app routes and UI
   src/app/api/markets      Live market feed
-  src/app/api/trades       Trade ticket endpoint
   src/app/api/ask          AI analyst endpoint
   src/app/api/weather      Weather context endpoint
 

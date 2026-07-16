@@ -972,12 +972,21 @@ p { color: var(--muted); }
   gap: 6px;
   color: var(--muted);
 }
-.ticket label input, .liquidity-panel input {
+.ticket label input, .liquidity-panel input, .oracle input, .oracle textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px;
   background: rgba(255,255,255,.05);
   color: var(--text);
+}
+.oracle label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+}
+.oracle textarea {
+  min-height: 88px;
+  resize: vertical;
 }
 .quick-row {
   display: grid;
@@ -1071,6 +1080,24 @@ p { color: var(--muted); }
   justify-content: center;
   align-items: center;
   gap: 7px;
+}
+.settlement-action, .oracle button {
+  border: 0;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-weight: 900;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.settlement-action {
+  background: rgba(74,222,128,.14);
+  color: #98ffb4;
+}
+.oracle button {
+  background: rgba(239,60,255,.16);
+  color: #ffd0ff;
 }
 .pool-bars {
   display: grid;

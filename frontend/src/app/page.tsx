@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
+import { TransactionStatus } from "genlayer-js/types";
 
 type Market = {
   id: number;
@@ -41,6 +42,13 @@ type Market = {
   note: string;
   source?: string;
   sourceUrl?: string;
+  onchainStatus?: string;
+  onchainLiquidityCents?: number;
+  onchainVolumeCents?: number;
+  onchainBalanceGEN?: string;
+  evidenceCount?: number;
+  disputeCount?: number;
+  resolutionNote?: string;
 };
 
 type WeatherSnapshot = {
@@ -80,11 +88,28 @@ type Position = {
   id: string;
   marketTitle: string;
   outcome: string;
-  side: "buy" | "sell";
+  side: "buy" | "sell" | "liquidity";
   amount: number;
   price: number;
   shares: number;
   createdAt: string;
+};
+
+type OnchainMarketSnapshot = {
+  marketId: number | null;
+  exists: boolean;
+  status: string;
+  liquidityCents: number;
+  volumeCents: number;
+  balanceGEN: string;
+  evidenceCount: number;
+  disputeCount: number;
+  resolvedOutcome: number;
+  resolutionNote: string;
+  pricesByOutcome: Record<string, number>;
+  poolsByOutcome: Record<string, number>;
+  userPositionsByOutcome: Record<string, number>;
+  liquidityPositionCents: number;
 };
 
 type Mission = {
@@ -110,6 +135,7 @@ const STUDIO_CHAIN_ID = "0xf22f";
 const STUDIO_RPC_URL = "https://studio.genlayer.com/api";
 const GENLAYER_SNAP_ID = "npm:genlayer-wallet-plugin";
 const GENLAYER_STUDIO_URL = "https://studio.genlayer.com/";
+const readClient = createClient({ chain: studionet });
 
 declare global {
   interface Window {
@@ -555,7 +581,16 @@ export default function Home() {
   const [aiQuestion, setAiQuestion] = useState("Explain the resolution risk for this market.");
   const [aiAnswer, setAiAnswer] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [evidenceUrl, setEvidenceUrl] = useState("https://predicto-arena.vercel.app/api/markets");
+  const [evidenceNote, setEvidenceNote] = useState("Submitted evidence for oracle review.");
+  const [disputeNote, setDisputeNote] = useState("Please re-check the outcome against the submitted evidence and rules.");
+  const [oracleBusy, setOracleBusy] = useState(false);
+  const [claimBusy, setClaimBusy] = useState(false);
+  const [oracleStatus, setOracleStatus] = useState("");
   const [positions, setPositions] = useState<Position[]>([]);
+  const [activeOnchainMarket, setActiveOnchainMarket] = useState<OnchainMarketSnapshot | null>(null);
+  const [portfolioBusy, setPortfolioBusy] = useState(false);
+  const [onchainStatus, setOnchainStatus] = useState("Loading contract state...");
   const [tickets, setTickets] = useState(0);
   const [missions, setMissions] = useState<Mission[]>([
     { id: "trade-3", title: "Trade three active markets", reward: 40, progress: 0, target: 3, claimed: false },
@@ -604,7 +639,6 @@ export default function Home() {
     if (!saved) return;
     try {
       const session = JSON.parse(saved);
-      if (Array.isArray(session.positions)) setPositions(session.positions);
       if (Array.isArray(session.missions)) setMissions(session.missions);
       if (Array.isArray(session.feed)) setFeed(session.feed);
       if (typeof session.tickets === "number") setTickets(session.tickets);
@@ -614,8 +648,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("predicto-session", JSON.stringify({ positions, missions, feed, tickets }));
-  }, [feed, missions, positions, tickets]);
+    window.localStorage.setItem("predicto-session", JSON.stringify({ missions, feed, tickets }));
+  }, [feed, missions, tickets]);
 
   useEffect(() => {
     if (!window.ethereum?.on) return;
@@ -651,6 +685,25 @@ export default function Home() {
   const heroCategory = activeCategory === "All" ? activeMarket.category : activeCategory;
   const heroImage = categoryImages[heroCategory] ?? categoryImages.All;
   const contextLocation = inferWeatherLocation(activeMarket, tradeOutcome);
+
+  useEffect(() => {
+    setEvidenceUrl(activeMarket.sourceUrl || "https://predicto-arena.vercel.app/api/markets");
+    setEvidenceNote(`Evidence submitted for ${activeMarket.title}.`);
+    setDisputeNote(`Please reconsider ${activeMarket.title} using the submitted evidence and dispute context.`);
+    setOracleStatus("");
+  }, [activeMarket.id, activeMarket.sourceUrl, activeMarket.title]);
+
+  useEffect(() => {
+    refreshActiveOnchainMarket(activeMarket).catch(() => null);
+  }, [activeMarket.id, walletAddress, contractAddress]);
+
+  useEffect(() => {
+    if (!walletAddress) {
+      setPositions([]);
+      return;
+    }
+    refreshOnchainPortfolio(walletAddress).catch(() => null);
+  }, [walletAddress, marketData, contractAddress]);
 
   useEffect(() => {
     let cancelled = false;
@@ -772,8 +825,8 @@ export default function Home() {
     if (tradeSide === "sell") {
       const hasPosition = positions.some((position) => position.marketTitle === activeMarket.title && position.outcome === tradeOutcome && position.side === "buy");
       if (!hasPosition) {
-        setTradeStatus("No local buy position found for this outcome. Buy shares first, then sell.");
-        setTxSteps(["Sell blocked", "No matching position", "Buy this outcome first"]);
+        setTradeStatus("No on-chain buy position found for this outcome. Buy shares first, then sell.");
+        setTxSteps(["Sell blocked", "No matching on-chain position", "Buy this outcome first"]);
         return;
       }
     }
@@ -807,40 +860,16 @@ export default function Home() {
       await ensureGenLayerSnap();
       const outcomeIndex = Math.max(1, displayOutcomes.findIndex((outcome) => outcome.name === tradeOutcome) + 1);
       const amountCents = Math.max(1, Math.round(amountNumber * 100));
-      const txHash = await submitGenLayerTrade(account, activeMarket, outcomeIndex, amountCents, amountNumber);
+      const { client, txHash } = await submitGenLayerTrade(account, activeMarket, outcomeIndex, amountCents, amountNumber);
       setTxSteps(["Wallet confirmed", "GenLayer transaction sent", shortHash(txHash)]);
-
-      const response = await fetch("/api/trades", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          marketId: activeMarket.id,
-          outcome: tradeOutcome,
-          side: tradeSide,
-          amount: Number(amount || 0),
-          wallet: account
-        })
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Trade API failed");
-      const shares = Number(amount || 0) / Math.max(0.01, selectedOutcome.price / 100);
-      setPositions((items) => [
-        {
-          id: result.ticketId,
-          marketTitle: activeMarket.title,
-          outcome: tradeOutcome,
-          side: tradeSide,
-          amount: Number(amount || 0),
-          price: selectedOutcome.price,
-          shares,
-          createdAt: result.createdAt
-        },
-        ...items
-      ]);
+      await waitForFinalized(client, txHash);
+      setTxSteps(["Wallet confirmed", "GenLayer transaction sent", `Finalized ${shortHash(txHash)}`]);
+      await refreshActiveOnchainMarket(activeMarket, account);
+      await refreshOnchainPortfolio(account);
       updateMission("trade-3", 1);
       updateMission("liquidity-100", Number(amount || 0));
       await refreshWalletState(account);
-      setTradeStatus(`GenLayer tx ${shortHash(txHash)} / ticket ${result.ticketId}`);
+      setTradeStatus(`GenLayer tx finalized ${shortHash(txHash)}`);
       setFeed((items) => [`${tradeSide.toUpperCase()} ${tradeOutcome} with ${amount || "0"} GEN on StudioNet`, ...items].slice(0, 6));
     } catch (error) {
       const message = extractErrorMessage(error);
@@ -868,9 +897,12 @@ export default function Home() {
         const account = walletAddress || (await requestPrimaryAccount());
         await ensureStudioNet();
         await ensureGenLayerSnap();
-        const txHash = await submitGenLayerCreateMarket(account, nextMarket);
+        const { client, txHash } = await submitGenLayerCreateMarket(account, nextMarket);
+        await waitForFinalized(client, txHash);
         onchainNote = ` and mirrored on GenLayer ${shortHash(txHash)}`;
         await refreshWalletState(account);
+        await refreshActiveOnchainMarket(nextMarket, account);
+        await refreshOnchainPortfolio(account);
       } catch (chainError) {
         onchainNote = `, API saved; GenLayer mirror pending (${extractErrorMessage(chainError)})`;
       }
@@ -947,7 +979,10 @@ export default function Home() {
       await ensureStudioNet();
       await ensureGenLayerSnap();
       const amountCents = Math.max(1, Math.round(value * 100));
-      const txHash = await submitGenLayerLiquidity(account, activeMarket, amountCents, value);
+      const { client, txHash } = await submitGenLayerLiquidity(account, activeMarket, amountCents, value);
+      await waitForFinalized(client, txHash);
+      await refreshActiveOnchainMarket(activeMarket, account);
+      await refreshOnchainPortfolio(account);
       updateMission("liquidity-100", value);
       await refreshWalletState(account);
       setFeed((items) => [`Added ${value.toFixed(2)} GEN liquidity on GenLayer ${shortHash(txHash)}`, ...items].slice(0, 6));
@@ -956,6 +991,122 @@ export default function Home() {
       setFeed((items) => [`Liquidity error: ${message}`, ...items].slice(0, 6));
     } finally {
       setLiquidityBusy(false);
+    }
+  }
+
+  async function submitEvidence() {
+    if (oracleBusy) return;
+    if (evidenceUrl.trim().length < 8 || evidenceNote.trim().length < 10) {
+      setOracleStatus("Evidence needs a valid URL and a note with enough detail.");
+      return;
+    }
+    setOracleBusy(true);
+    setOracleStatus("Submitting evidence to GenLayer...");
+    try {
+      if (!walletAddress) {
+        await connectWallet();
+      }
+      const account = walletAddress || (await requestPrimaryAccount());
+      await ensureStudioNet();
+      await ensureGenLayerSnap();
+      const { client, txHash } = await submitGenLayerEvidence(account, activeMarket, evidenceUrl.trim(), evidenceNote.trim());
+      await waitForFinalized(client, txHash);
+      await refreshActiveOnchainMarket(activeMarket, account);
+      await refreshWalletState(account);
+      updateMission("oracle-review", 1);
+      setOracleStatus(`Evidence finalized on GenLayer ${shortHash(txHash)}`);
+      setFeed((items) => [`Evidence submitted for ${activeMarket.title} ${shortHash(txHash)}`, ...items].slice(0, 6));
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      setOracleStatus(message);
+      setFeed((items) => [`Evidence error: ${message}`, ...items].slice(0, 6));
+    } finally {
+      setOracleBusy(false);
+    }
+  }
+
+  async function submitDispute() {
+    if (oracleBusy) return;
+    if (disputeNote.trim().length < 20) {
+      setOracleStatus("Dispute note must explain why the current resolution should change.");
+      return;
+    }
+    setOracleBusy(true);
+    setOracleStatus("Opening dispute on GenLayer...");
+    try {
+      if (!walletAddress) {
+        await connectWallet();
+      }
+      const account = walletAddress || (await requestPrimaryAccount());
+      await ensureStudioNet();
+      await ensureGenLayerSnap();
+      const { client, txHash } = await submitGenLayerDispute(account, activeMarket, disputeNote.trim());
+      await waitForFinalized(client, txHash);
+      await refreshActiveOnchainMarket(activeMarket, account);
+      await refreshWalletState(account);
+      setOracleStatus(`Dispute finalized on GenLayer ${shortHash(txHash)}`);
+      setFeed((items) => [`Dispute opened for ${activeMarket.title} ${shortHash(txHash)}`, ...items].slice(0, 6));
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      setOracleStatus(message);
+      setFeed((items) => [`Dispute error: ${message}`, ...items].slice(0, 6));
+    } finally {
+      setOracleBusy(false);
+    }
+  }
+
+  async function resolveMarketOnchain() {
+    if (oracleBusy) return;
+    setOracleBusy(true);
+    setOracleStatus("Resolving market with submitted evidence and disputes...");
+    try {
+      if (!walletAddress) {
+        await connectWallet();
+      }
+      const account = walletAddress || (await requestPrimaryAccount());
+      await ensureStudioNet();
+      await ensureGenLayerSnap();
+      const { client, txHash } = await submitGenLayerResolve(account, activeMarket);
+      await waitForFinalized(client, txHash);
+      await refreshActiveOnchainMarket(activeMarket, account);
+      await refreshOnchainPortfolio(account);
+      await refreshWalletState(account);
+      setOracleStatus(`Resolution finalized on GenLayer ${shortHash(txHash)}`);
+      setFeed((items) => [`Resolved ${activeMarket.title} via GenLayer ${shortHash(txHash)}`, ...items].slice(0, 6));
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      setOracleStatus(message);
+      setFeed((items) => [`Resolve error: ${message}`, ...items].slice(0, 6));
+    } finally {
+      setOracleBusy(false);
+    }
+  }
+
+  async function claimMarketWinnings() {
+    if (claimBusy) return;
+    setClaimBusy(true);
+    setTradeStatus("Claiming on-chain winnings...");
+    try {
+      if (!walletAddress) {
+        await connectWallet();
+      }
+      const account = walletAddress || (await requestPrimaryAccount());
+      await ensureStudioNet();
+      await ensureGenLayerSnap();
+      const outcomeIndex = Math.max(1, displayOutcomes.findIndex((outcome) => outcome.name === tradeOutcome) + 1);
+      const { client, txHash } = await submitGenLayerClaim(account, activeMarket, outcomeIndex);
+      await waitForFinalized(client, txHash);
+      await refreshActiveOnchainMarket(activeMarket, account);
+      await refreshOnchainPortfolio(account);
+      await refreshWalletState(account);
+      setTradeStatus(`Claim finalized on GenLayer ${shortHash(txHash)}`);
+      setFeed((items) => [`Claimed winnings for ${tradeOutcome} ${shortHash(txHash)}`, ...items].slice(0, 6));
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      setTradeStatus(message);
+      setFeed((items) => [`Claim error: ${message}`, ...items].slice(0, 6));
+    } finally {
+      setClaimBusy(false);
     }
   }
 
@@ -1091,6 +1242,194 @@ export default function Home() {
     setWalletChain(chainId === STUDIO_CHAIN_ID ? "GenLayer StudioNet" : String(chainId));
   }
 
+  function currentContractAddress() {
+    return (contractAddress || CONTRACT_ADDRESS) as `0x${string}`;
+  }
+
+  async function createStudionetClient(account: string) {
+    const client = createClient({ chain: studionet, account: account as `0x${string}` });
+    await client.connect("studionet");
+    return client;
+  }
+
+  async function waitForFinalized(client: any, txHash: string) {
+    await client.waitForTransactionReceipt({
+      hash: txHash,
+      status: TransactionStatus.FINALIZED,
+      retries: 220
+    });
+  }
+
+  function parseContractInt(value: unknown) {
+    if (typeof value === "bigint") return Number(value);
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  }
+
+  function parseContractText(value: unknown) {
+    return typeof value === "string" ? value : value == null ? "" : String(value);
+  }
+
+  async function readOnchainMarket(market: Market, account?: string): Promise<OnchainMarketSnapshot> {
+    const externalId = String(market.id);
+    const marketIdResult = await readClient.readContract({
+      address: currentContractAddress(),
+      functionName: "get_market_id_by_external_id",
+      args: [externalId],
+      stateStatus: "accepted"
+    });
+    const onchainMarketId = parseContractInt(marketIdResult);
+    if (!onchainMarketId) {
+      return {
+        marketId: null,
+        exists: false,
+        status: "NOT_CREATED",
+        liquidityCents: 0,
+        volumeCents: 0,
+        balanceGEN: "0.0000",
+        evidenceCount: 0,
+        disputeCount: 0,
+        resolvedOutcome: 0,
+        resolutionNote: "This market has not been mirrored on-chain yet.",
+        pricesByOutcome: {},
+        poolsByOutcome: {},
+        userPositionsByOutcome: {},
+        liquidityPositionCents: 0
+      };
+    }
+
+    const marketResult = await readClient.readContract({
+      address: currentContractAddress(),
+      functionName: "get_market",
+      args: [onchainMarketId],
+      stateStatus: "accepted"
+    }) as Record<string, unknown>;
+
+    const outcomes = isFootballMarket(market) ? buildWorldCupOutcomes(market) : market.outcomes;
+    const outcomeReads = await Promise.all(
+      outcomes.map(async (outcome, index) => {
+        const outcomeResult = await readClient.readContract({
+          address: currentContractAddress(),
+          functionName: "get_outcome",
+          args: [onchainMarketId, index + 1],
+          stateStatus: "accepted"
+        }) as Record<string, unknown>;
+
+        let userPosition = 0;
+        if (account) {
+          const positionResult = await readClient.readContract({
+            address: currentContractAddress(),
+            functionName: "get_position",
+            args: [onchainMarketId, index + 1, account],
+            stateStatus: "accepted"
+          });
+          userPosition = parseContractInt(positionResult);
+        }
+
+        return {
+          outcome: outcome.name,
+          priceCents: parseContractInt(outcomeResult.price_cents),
+          poolCents: parseContractInt(outcomeResult.pool_cents),
+          userPositionCents: userPosition
+        };
+      })
+    );
+
+    const liquidityResult = account
+      ? await readClient.readContract({
+          address: currentContractAddress(),
+          functionName: "get_liquidity_position",
+          args: [onchainMarketId, account],
+          stateStatus: "accepted"
+        })
+      : 0;
+
+    const pricesByOutcome = Object.fromEntries(outcomeReads.map((item) => [item.outcome, item.priceCents]));
+    const poolsByOutcome = Object.fromEntries(outcomeReads.map((item) => [item.outcome, item.poolCents]));
+    const userPositionsByOutcome = Object.fromEntries(outcomeReads.map((item) => [item.outcome, item.userPositionCents]));
+
+    return {
+      marketId: onchainMarketId,
+      exists: true,
+      status: parseContractText(marketResult.status),
+      liquidityCents: parseContractInt(marketResult.liquidity_cents),
+      volumeCents: parseContractInt(marketResult.volume_cents),
+      balanceGEN: formatGEN(BigInt(parseContractText(marketResult.contract_balance_wei) || "0")),
+      evidenceCount: parseContractInt(marketResult.evidence_count),
+      disputeCount: parseContractInt(marketResult.dispute_count),
+      resolvedOutcome: parseContractInt(marketResult.resolved_outcome),
+      resolutionNote: parseContractText(marketResult.resolution_note),
+      pricesByOutcome,
+      poolsByOutcome,
+      userPositionsByOutcome,
+      liquidityPositionCents: parseContractInt(liquidityResult)
+    };
+  }
+
+  async function refreshActiveOnchainMarket(nextMarket: Market = activeMarket, account = walletAddress) {
+    try {
+      const snapshot = await readOnchainMarket(nextMarket, account || undefined);
+      setActiveOnchainMarket(snapshot);
+      setOnchainStatus(snapshot.exists ? `On-chain market ${snapshot.status}` : "On-chain market not created yet");
+      return snapshot;
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      setOnchainStatus(`On-chain read error: ${message}`);
+      return null;
+    }
+  }
+
+  async function refreshOnchainPortfolio(account = walletAddress) {
+    if (!account) {
+      setPositions([]);
+      return;
+    }
+    setPortfolioBusy(true);
+    try {
+      const nextPositions: Position[] = [];
+      for (const market of marketData) {
+        const snapshot = await readOnchainMarket(market, account);
+        if (!snapshot.exists || !snapshot.marketId) continue;
+        const outcomes = isFootballMarket(market) ? buildWorldCupOutcomes(market) : market.outcomes;
+        for (const outcome of outcomes) {
+          const userPositionCents = snapshot.userPositionsByOutcome[outcome.name] ?? 0;
+          if (userPositionCents > 0) {
+            nextPositions.push({
+              id: `onchain-${snapshot.marketId}-${outcome.name}`,
+              marketTitle: market.title,
+              outcome: outcome.name,
+              side: "buy",
+              amount: userPositionCents / 100,
+              price: snapshot.pricesByOutcome[outcome.name] ?? outcome.price,
+              shares: userPositionCents / 100,
+              createdAt: "On-chain"
+            });
+          }
+        }
+        const liquidityCents = snapshot.liquidityPositionCents;
+        if (liquidityCents > 0) {
+          nextPositions.push({
+            id: `onchain-liquidity-${snapshot.marketId}`,
+            marketTitle: market.title,
+            outcome: "Liquidity",
+            side: "liquidity",
+            amount: liquidityCents / 100,
+            price: 100,
+            shares: liquidityCents / 100,
+            createdAt: "On-chain"
+          });
+        }
+      }
+      setPositions(nextPositions);
+    } finally {
+      setPortfolioBusy(false);
+    }
+  }
+
   function contractMarketArgs(market: Market) {
     const rules = market.note.length >= 30 ? market.note : `${market.title}. Resolve using public evidence and the listed source data.`;
     const outcomes = isFootballMarket(market) ? buildWorldCupOutcomes(market) : market.outcomes;
@@ -1105,45 +1444,90 @@ export default function Home() {
   }
 
   async function submitGenLayerTrade(account: string, market: Market, outcomeIndex: number, amountCents: number, amountGen: number) {
-    const client = createClient({ chain: studionet, account: account as `0x${string}` });
-    await client.connect("studionet");
+    const client = await createStudionetClient(account);
     const baseArgs = contractMarketArgs(market);
     if (tradeSide === "sell") {
-      return client.writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
+      const txHash = await client.writeContract({
+        address: currentContractAddress(),
         functionName: "sell_position_by_external_id",
         args: [String(market.id), outcomeIndex, amountCents],
         value: BigInt(0)
       });
+      return { client, txHash };
     }
-    return client.writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
+    const txHash = await client.writeContract({
+      address: currentContractAddress(),
       functionName: "ensure_market_and_buy",
       args: [...baseArgs, outcomeIndex, amountCents],
       value: parseGEN(amountGen)
     });
+    return { client, txHash };
   }
 
   async function submitGenLayerLiquidity(account: string, market: Market, amountCents: number, amountGen: number) {
-    const client = createClient({ chain: studionet, account: account as `0x${string}` });
-    await client.connect("studionet");
-    return client.writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
+    const client = await createStudionetClient(account);
+    const txHash = await client.writeContract({
+      address: currentContractAddress(),
       functionName: "ensure_market_and_add_liquidity",
       args: [...contractMarketArgs(market), amountCents],
       value: parseGEN(amountGen)
     });
+    return { client, txHash };
   }
 
   async function submitGenLayerCreateMarket(account: string, market: Market) {
-    const client = createClient({ chain: studionet, account: account as `0x${string}` });
-    await client.connect("studionet");
-    return client.writeContract({
-      address: CONTRACT_ADDRESS as `0x${string}`,
+    const client = await createStudionetClient(account);
+    const txHash = await client.writeContract({
+      address: currentContractAddress(),
       functionName: "create_market_with_external_id",
       args: contractMarketArgs(market),
       value: BigInt(0)
     });
+    return { client, txHash };
+  }
+
+  async function submitGenLayerEvidence(account: string, market: Market, url: string, note: string) {
+    const client = await createStudionetClient(account);
+    const txHash = await client.writeContract({
+      address: currentContractAddress(),
+      functionName: "add_evidence",
+      args: [market.id, url, note],
+      value: BigInt(0)
+    });
+    return { client, txHash };
+  }
+
+  async function submitGenLayerDispute(account: string, market: Market, note: string) {
+    const client = await createStudionetClient(account);
+    const txHash = await client.writeContract({
+      address: currentContractAddress(),
+      functionName: "open_dispute",
+      args: [market.id, note],
+      value: BigInt(0)
+    });
+    return { client, txHash };
+  }
+
+  async function submitGenLayerResolve(account: string, market: Market) {
+    const client = await createStudionetClient(account);
+    const txHash = await client.writeContract({
+      address: currentContractAddress(),
+      functionName: "resolve_market",
+      args: [market.id],
+      value: BigInt(0)
+    });
+    return { client, txHash };
+  }
+
+  async function submitGenLayerClaim(account: string, market: Market, outcomeIndex: number) {
+    const client = await createStudionetClient(account);
+    const txHash = await client.writeContract({
+      address: currentContractAddress(),
+      functionName: "claim_winnings",
+      args: [market.id, outcomeIndex],
+      value: BigInt(0)
+    });
+    return { client, txHash };
   }
 
   return (
@@ -1307,6 +1691,9 @@ export default function Home() {
                   <button className="submit-trade pulse-action" onClick={submitTrade} disabled={tradeBusy}>
                     <ShoppingCart size={16} />{tradeBusy ? "Submitting..." : tradeSide === "buy" ? "Buy shares" : "Sell shares"}
                   </button>
+                  <button className="settlement-action" onClick={claimMarketWinnings} disabled={claimBusy}>
+                    <Coins size={16} />{claimBusy ? "Claiming..." : "Claim winnings"}
+                  </button>
                   {walletSnapReady === false && (
                     <a className="snap-help" href={GENLAYER_STUDIO_URL} target="_blank" rel="noreferrer">
                       {selectedWallet === "metamask" ? "Open GenLayer Studio to enable the GenLayer Snap" : `${walletName} connected. Use MetaMask + GenLayer Snap to submit GenLayer writes.`}
@@ -1317,8 +1704,23 @@ export default function Home() {
                 </div>
               )}
               {drawerTab === "Book" && <OrderBook market={activeMarket} />}
-              {drawerTab === "Rules" && <Rules market={activeMarket} />}
-              {drawerTab === "Oracle" && <Oracle market={activeMarket} />}
+              {drawerTab === "Rules" && <Rules market={activeMarket} onchain={activeOnchainMarket} status={onchainStatus} />}
+              {drawerTab === "Oracle" && (
+                <Oracle
+                  market={activeMarket}
+                  evidenceUrl={evidenceUrl}
+                  evidenceNote={evidenceNote}
+                  disputeNote={disputeNote}
+                  busy={oracleBusy}
+                  status={oracleStatus}
+                  onEvidenceUrl={setEvidenceUrl}
+                  onEvidenceNote={setEvidenceNote}
+                  onDisputeNote={setDisputeNote}
+                  onSubmitEvidence={submitEvidence}
+                  onSubmitDispute={submitDispute}
+                  onResolve={resolveMarketOnchain}
+                />
+              )}
             </div>
             <LiquidityPanel amount={liquidityAmount} busy={liquidityBusy} onAmount={setLiquidityAmount} onAdd={addLiquidity} market={activeMarket} />
 
@@ -1338,7 +1740,7 @@ export default function Home() {
               onQuestion={setAiQuestion}
               onAsk={askAi}
             />
-            <GenLayerPanel contractAddress={contractAddress} network={network} dataSources={dataSources} />
+            <GenLayerPanel contractAddress={contractAddress} network={network} dataSources={dataSources} onchain={activeOnchainMarket} status={onchainStatus} />
           </aside>
         </section>
       )}
@@ -1351,7 +1753,7 @@ export default function Home() {
           onSubmit={submitMarket}
         />
       )}
-      {activeNav === "Portfolio" && <Portfolio feed={feed} positions={positions} />}
+      {activeNav === "Portfolio" && <Portfolio feed={feed} positions={positions} busy={portfolioBusy} />}
       {activeNav === "Leaderboard" && <Leaderboard walletAddress={walletAddress} positions={positions} tickets={tickets} />}
       {activeNav === "Earn Tickets" && <Tickets missions={missions} onClaim={claimMission} />}
 
@@ -1860,11 +2262,15 @@ function AiPanel({
 function GenLayerPanel({
   contractAddress,
   network,
-  dataSources
+  dataSources,
+  onchain,
+  status
 }: {
   contractAddress: string;
   network: string;
   dataSources: string[];
+  onchain: OnchainMarketSnapshot | null;
+  status: string;
 }) {
   return (
     <div className="genlayer-panel">
@@ -1872,7 +2278,10 @@ function GenLayerPanel({
       <div><span>Network</span><strong>{network}</strong></div>
       <div><span>Contract</span><strong>{shortAddress(contractAddress)}</strong></div>
       <div><span>Methods</span><strong>factory / trade / evidence / dispute</strong></div>
+      <div><span>Read path</span><strong>{onchain?.exists ? "Live contract reads" : "Waiting for on-chain market"}</strong></div>
+      <div><span>Settlement balance</span><strong>{onchain?.balanceGEN ?? "0.0000"} GEN</strong></div>
       <p>Market resolution is designed around GenLayer web evidence and AI consensus. Live prices are pulled from public exchange APIs, then resolved by contract rules.</p>
+      <p>{status}</p>
       <div className="source-list">
         {dataSources.map((source) => <span key={source}>{source}</span>)}
       </div>
@@ -1977,30 +2386,75 @@ function OrderBook({ market }: { market: Market }) {
   );
 }
 
-function Rules({ market }: { market: Market }) {
+function Rules({ market, onchain, status }: { market: Market; onchain: OnchainMarketSnapshot | null; status: string }) {
   return (
     <div className="rules">
       <h2>Resolution rules</h2>
       <p>{market.note}</p>
       {market.sourceUrl && <a href={market.sourceUrl} target="_blank" rel="noreferrer">Open source data</a>}
       <p>Markets resolve through public sources, oracle review, and GenLayer-style consensus checks. Ambiguous outcomes remain open until the evidence threshold is met.</p>
+      <div><span>On-chain status</span><strong>{onchain?.status ?? "Unknown"}</strong></div>
+      <div><span>Evidence / disputes</span><strong>{`${onchain?.evidenceCount ?? 0} / ${onchain?.disputeCount ?? 0}`}</strong></div>
+      <p>{onchain?.resolutionNote || status}</p>
     </div>
   );
 }
 
-function Oracle({ market }: { market: Market }) {
+function Oracle({
+  market,
+  evidenceUrl,
+  evidenceNote,
+  disputeNote,
+  busy,
+  status,
+  onEvidenceUrl,
+  onEvidenceNote,
+  onDisputeNote,
+  onSubmitEvidence,
+  onSubmitDispute,
+  onResolve
+}: {
+  market: Market;
+  evidenceUrl: string;
+  evidenceNote: string;
+  disputeNote: string;
+  busy: boolean;
+  status: string;
+  onEvidenceUrl: (value: string) => void;
+  onEvidenceNote: (value: string) => void;
+  onDisputeNote: (value: string) => void;
+  onSubmitEvidence: () => void;
+  onSubmitDispute: () => void;
+  onResolve: () => void;
+}) {
   return (
     <div className="oracle">
       <h2>Oracle route</h2>
       <div><span>Primary source</span><strong>{market.category} public data</strong></div>
       <div><span>Live API</span><strong>{market.source ?? "Predicto"}</strong></div>
       <div><span>Review mode</span><strong>AI evidence consensus</strong></div>
-      <div><span>Status</span><strong>Ready</strong></div>
+      <div><span>Status</span><strong>{busy ? "Writing on-chain" : "Ready"}</strong></div>
+      <label>
+        Evidence URL
+        <input value={evidenceUrl} onChange={(event) => onEvidenceUrl(event.target.value)} />
+      </label>
+      <label>
+        Evidence note
+        <textarea value={evidenceNote} onChange={(event) => onEvidenceNote(event.target.value)} />
+      </label>
+      <button onClick={onSubmitEvidence} disabled={busy}><Plus size={15} />Submit evidence</button>
+      <label>
+        Dispute note
+        <textarea value={disputeNote} onChange={(event) => onDisputeNote(event.target.value)} />
+      </label>
+      <button onClick={onSubmitDispute} disabled={busy}><ShieldCheck size={15} />Open dispute</button>
+      <button onClick={onResolve} disabled={busy}><Zap size={15} />Resolve with evidence</button>
+      {status && <p className="api-note">{status}</p>}
     </div>
   );
 }
 
-function Portfolio({ feed, positions }: { feed: string[]; positions: Position[] }) {
+function Portfolio({ feed, positions, busy }: { feed: string[]; positions: Position[]; busy: boolean }) {
   const totalValue = positions.reduce((sum, item) => sum + item.amount, 0);
   const exposure = positions.reduce((sum, item) => sum + item.shares, 0);
 
@@ -2013,7 +2467,8 @@ function Portfolio({ feed, positions }: { feed: string[]; positions: Position[] 
       </div>
       <div className="portfolio-table">
         <h2><ShoppingCart size={18} />Open positions</h2>
-        {positions.length === 0 && <p>No positions yet. Place a trade from the Markets tab.</p>}
+        {busy && <p>Refreshing on-chain positions...</p>}
+        {!busy && positions.length === 0 && <p>No on-chain positions yet. Place a trade from the Markets tab.</p>}
         {positions.map((position) => (
           <div key={position.id}>
             <span>{position.marketTitle}</span>
